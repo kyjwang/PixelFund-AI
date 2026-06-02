@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-pixel: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+body {
+  @apply bg-[#edf6f9] text-slate-900;
+}
+
+.pixel-card {
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 2px #111, 6px 6px 0 #111;
+}
+
+:focus-visible {
+  outline: 3px solid #0c7c59;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

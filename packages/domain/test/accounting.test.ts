@@ -1,0 +1,199 @@
+import { describe, expect, test } from "vitest";
+import {
+  aggregatePortfolioManager,
+  aggregateRecommendation,
+  applyTrade,
+  buildAgentAnalysis,
+  computeTechnicalIndicators,
+  runPortfolioManagerBacktest
+} from "../src/index";
+import type { MarketContext } from "@pixelfund/schemas";
+
+describe("portfolio accounting", () => {
+  test("buy and average cost", () => {
+    let state = { cash: 1000, positions: [] as any[] };
+    state = applyTrade(state.cash, state.positions, "AAPL", "BUY", 2, 100);
+    state = applyTrade(state.cash, state.positions, "AAPL", "BUY", 2, 200);
+    expect(state.cash).toBe(400);
+    expect(state.positions[0].averageCost).toBe(150);
+    expect(state.positions[0].quantity).toBe(4);
+  });
+
+  test("insufficient funds", () => {
+    expect(() => applyTrade(100, [], "AAPL", "BUY", 2, 60)).toThrow("INSUFFICIENT_FUNDS");
+  });
+
+  test("sell and insufficient shares", () => {
+    const bought = applyTrade(1000, [], "AAPL", "BUY", 2, 100);
+    const sold = applyTrade(bought.cash, bought.positions, "AAPL", "SELL", 1, 130);
+    expect(sold.positions[0].quantity).toBe(1);
+    expect(sold.realizedPnlDelta).toBe(30);
+    expect(() => applyTrade(sold.cash, sold.positions, "AAPL", "SELL", 2, 130)).toThrow("INSUFFICIENT_SHARES");
+  });
+
+  test("full liquidation then re-entry", () => {
+    const bought = applyTrade(2000, [], "MSFT", "BUY", 4, 100);
+    const liquidated = applyTrade(bought.cash, bought.positions, "MSFT", "SELL", 4, 110);
+    expect(liquidated.positions.length).toBe(0);
+    expect(liquidated.realizedPnlDelta).toBe(40);
+    const reentry = applyTrade(liquidated.cash, liquidated.positions, "MSFT", "BUY", 2, 120);
+    expect(reentry.positions[0].quantity).toBe(2);
+    expect(reentry.positions[0].averageCost).toBe(120);
+  });
+
+  test("repeated buys then staged sells", () => {
+    let state = applyTrade(5000, [], "NVDA", "BUY", 2, 100);
+    state = applyTrade(state.cash, state.positions, "NVDA", "BUY", 3, 160);
+    expect(state.positions[0].averageCost).toBe(136);
+    const sell1 = applyTrade(state.cash, state.positions, "NVDA", "SELL", 1, 180);
+    expect(sell1.realizedPnlDelta).toBe(44);
+    const sell2 = applyTrade(sell1.cash, sell1.positions, "NVDA", "SELL", 2, 120);
+    expect(sell2.realizedPnlDelta).toBeCloseTo(-32, 5);
+  });
+});
+
+describe("recommendation aggregation", () => {
+  test("handles disagreement and missing data", () => {
+    const rec = aggregateRecommendation([
+      { recommendation: "BUY", confidence: 0.6 },
+      { recommendation: "AVOID", confidence: 0.7 },
+      { confidence: 0.9 }
+    ]);
+    expect(rec).toBe("AVOID");
+  });
+
+  test("risk analyst can cap an otherwise bullish manager result", () => {
+    const manager = aggregatePortfolioManager([
+      { agentType: "TECHNICAL_ANALYST", status: "COMPLETED", recommendation: "BUY", confidence: 0.8, summary: "trend" },
+      { agentType: "NEWS_ANALYST", status: "COMPLETED", recommendation: "BUY", confidence: 0.75, summary: "news" },
+      { agentType: "FUNDAMENTALS_ANALYST", status: "COMPLETED", recommendation: "BUY", confidence: 0.82, summary: "fundamentals" },
+      { agentType: "RISK_ANALYST", status: "COMPLETED", recommendation: "AVOID", confidence: 0.78, summary: "risk" }
+    ]);
+
+    expect(manager.recommendation).toBe("HOLD");
+    expect(manager.reasons.some((reason) => reason.includes("capped"))).toBe(true);
+  });
+});
+
+describe("agent analysis engine", () => {
+  test("fundamentals agent rewards profitable growth with reasonable valuation", () => {
+    const context = makeContext({
+      peRatio: 18,
+      revenueGrowth: 24,
+      epsGrowth: 30,
+      netMargin: 22,
+      roe: 28,
+      debtToEquity: 0.4
+    });
+
+    const output = buildAgentAnalysis("FUNDAMENTALS_ANALYST", "AAPL", context);
+    expect(output.recommendation).toBe("BUY");
+    expect(output.confidence).toBeGreaterThan(0.6);
+  });
+
+  test("technical indicators detect an uptrend", () => {
+    const candles = Array.from({ length: 60 }, (_item, idx) => ({
+      ticker: "AAPL",
+      date: new Date(Date.UTC(2026, 0, idx + 1)).toISOString().slice(0, 10),
+      open: 100 + idx,
+      high: 101 + idx,
+      low: 99 + idx,
+      close: 100 + idx,
+      volume: 1_000_000 + idx * 1000,
+      source: "test"
+    }));
+
+    const indicators = computeTechnicalIndicators(candles);
+    expect(indicators.trend).toBe("UP");
+    expect(indicators.sma20).toBeGreaterThan(indicators.sma50 ?? 0);
+  });
+
+  test("backtest returns deterministic performance metrics", () => {
+    const candles = Array.from({ length: 90 }, (_item, idx) => ({
+      ticker: "AAPL",
+      date: new Date(Date.UTC(2026, 0, idx + 1)).toISOString().slice(0, 10),
+      open: 100 + idx,
+      high: 101 + idx,
+      low: 99 + idx,
+      close: 100 + idx,
+      volume: 1_000_000,
+      source: "test"
+    }));
+
+    const result = runPortfolioManagerBacktest({
+      ticker: "AAPL",
+      from: candles[0].date,
+      to: candles[candles.length - 1].date,
+      strategy: "PORTFOLIO_MANAGER_REPLAY",
+      candles,
+      provider: "test",
+      status: "LIVE",
+      messages: ["test data"]
+    });
+
+    expect(result.trades).toBeGreaterThan(0);
+    expect(result.simulatedPnl).toBeGreaterThan(0);
+    expect(result.recommendationAccuracy).toBeGreaterThan(0.5);
+  });
+});
+
+function makeContext(fundamentals: Partial<MarketContext["fundamentals"]>): MarketContext {
+  return {
+    ticker: "AAPL",
+    quote: {
+      ticker: "AAPL",
+      price: 190,
+      change: 2,
+      changePercent: 1.1,
+      updatedAt: new Date().toISOString(),
+      source: "finnhub"
+    },
+    fundamentals: {
+      peRatio: 24,
+      marketCap: 2_000_000_000_000,
+      beta: 1.1,
+      revenueGrowth: 12,
+      epsGrowth: 10,
+      netMargin: 20,
+      roe: 22,
+      debtToEquity: 0.8,
+      week52High: 210,
+      week52Low: 140,
+      week52Return: 18,
+      tenDayAverageVolume: 80_000_000,
+      threeMonthAverageVolume: 70_000_000,
+      source: "finnhub",
+      ...fundamentals
+    },
+    news: [
+      {
+        headline: "Apple reports strong demand and profit growth",
+        sentiment: "positive",
+        sentimentScore: 0.75,
+        source: "Finnhub"
+      }
+    ],
+    analystTrend: {
+      period: "2026-06",
+      strongBuy: 8,
+      buy: 14,
+      hold: 10,
+      sell: 1,
+      strongSell: 0,
+      consensus: "BUY",
+      source: "finnhub"
+    },
+    generatedAt: new Date().toISOString(),
+    dataQuality: {
+      score: 1,
+      status: "LIVE",
+      provider: "finnhub",
+      liveQuote: true,
+      fundamentals: true,
+      news: true,
+      analystTrend: true,
+      warnings: [],
+      messages: ["AAPL is using live provider data."]
+    }
+  };
+}

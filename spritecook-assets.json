@@ -1,0 +1,42 @@
+[
+  {
+    "asset_id": "b1898298-e7f5-46e7-ae31-f4b991357b8e",
+    "sha12": "a699fb7faf3a",
+    "label": "tiny-trading-agent",
+    "file": "assets/spritecook/tiny-trading-agent.png",
+    "animations": [
+      {
+        "asset_id": "838c679a-16c7-4066-842c-4cadff27a450",
+        "sha12": "7c48a63f4098",
+        "label": "idle",
+        "file": "assets/spritecook/animations/tiny-trading-agent-idle.webp",
+        "frames": 8,
+        "fps": 8
+      }
+    ]
+  },
+  {
+    "asset_id": "895a7b18-5448-48b0-a230-3eb643669c08",
+    "sha12": "01a08a9d969d",
+    "label": "trading-agent-quant",
+    "file": "assets/spritecook/trading-agent-quant.png"
+  },
+  {
+    "asset_id": "b636b796-48bf-4a49-9b36-178bebcb2512",
+    "sha12": "4f54ae7c3f35",
+    "label": "trading-agent-crypto",
+    "file": "assets/spritecook/trading-agent-crypto.png"
+  },
+  {
+    "asset_id": "7acec785-2d9f-4d7e-b9eb-eaea011fdef9",
+    "sha12": "272b5d768967",
+    "label": "trading-agent-risk-manager",
+    "file": "assets/spritecook/trading-agent-risk-manager.png"
+  },
+  {
+    "asset_id": "2eb79a62-ed2e-4cfd-a8b4-34f521afed85",
+    "sha12": "e06365e39575",
+    "label": "trading-agent-broker",
+    "file": "assets/spritecook/trading-agent-broker.png"
+  }
+]

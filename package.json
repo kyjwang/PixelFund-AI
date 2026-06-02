@@ -1,0 +1,38 @@
+{
+  "name": "pixelfund-ai",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "dev:all": "npm run infra:up && npm run db:setup && npm run dev",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "docs:check-links": "node scripts/check-doc-links.mjs",
+    "health:check": "node scripts/health-check.mjs",
+    "dev:verify": "npm run docs:check-links && npm run typecheck && npm test",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:down:volumes": "docker compose down -v",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed"
+  },
+  "prisma": {
+    "seed": "ts-node --project tsconfig.base.json prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "prisma": "^5.16.2",
+    "ts-node": "^10.9.2",
+    "turbo": "^2.0.14",
+    "typescript": "^5.5.4"
+  }
+}

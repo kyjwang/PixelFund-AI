@@ -1,0 +1,32 @@
+
+> @pixelfund/web@1.0.0 build
+> next build
+
+  ▲ Next.js 14.2.5
+
+   Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: Unable to snapshot resolve dependencies
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: Unable to snapshot resolve dependencies
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/5) ...
+   Generating static pages (1/5) 
+   Generating static pages (2/5) 
+   Generating static pages (3/5) 
+ ✓ Generating static pages (5/5)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    33.4 kB         121 kB
+├ ○ /_not-found                          876 B            88 kB
+└ ○ /manifest.webmanifest                0 B                0 B
++ First Load JS shared by all            87.1 kB
+  ├ chunks/1dd3208c-b156ee21f67c6aea.js  53.7 kB
+  ├ chunks/286-133d591704cc591c.js       31.5 kB
+  └ other shared chunks (total)          1.91 kB
+
+
+○  (Static)  prerendered as static content
+

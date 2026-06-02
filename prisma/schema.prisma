@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum AgentType {
+  TECHNICAL_ANALYST
+  NEWS_ANALYST
+  FUNDAMENTALS_ANALYST
+  RISK_ANALYST
+  PORTFOLIO_MANAGER
+}
+
+enum AgentStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum Recommendation {
+  BUY
+  HOLD
+  AVOID
+}
+
+model DemoAccount {
+  id        String      @id @default(cuid())
+  cash      Float       @default(100000)
+  realizedPnl Float     @default(0)
+  positions Position[]
+  trades    Trade[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model Position {
+  id          String      @id @default(cuid())
+  accountId   String
+  account     DemoAccount @relation(fields: [accountId], references: [id])
+  ticker      String
+  quantity    Int
+  averageCost Float
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([accountId, ticker])
+}
+
+model Trade {
+  id        String      @id @default(cuid())
+  accountId String
+  account   DemoAccount @relation(fields: [accountId], references: [id])
+  ticker    String
+  side      TradeSide
+  quantity  Int
+  price     Float
+  createdAt DateTime    @default(now())
+}
+
+model WatchlistItem {
+  id        String   @id @default(cuid())
+  ticker    String   @unique
+  createdAt DateTime @default(now())
+}
+
+model AnalysisRun {
+  id              String         @id @default(cuid())
+  ticker          String
+  idempotencyKey  String?
+  status          AgentStatus    @default(PENDING)
+  errorReason     String?
+  finalSummary    String?
+  finalRec        Recommendation?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  recommendations AgentResult[]
+
+  @@index([ticker, createdAt])
+  @@index([idempotencyKey])
+}
+
+model AgentResult {
+  id             String         @id @default(cuid())
+  analysisRunId  String
+  analysisRun    AnalysisRun    @relation(fields: [analysisRunId], references: [id])
+  agentType      AgentType
+  status         AgentStatus    @default(PENDING)
+  errorReason    String?
+  summary        String?
+  confidence     Float?
+  recommendation Recommendation?
+  reasons        Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([analysisRunId, agentType])
+}
