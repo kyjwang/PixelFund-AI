@@ -1,6 +1,6 @@
-# pixelFund AI
+# PixelFund AI
 
-pixelFund AI is a pixel-art themed stock trading simulation web app with specialist AI agents, realtime quote streaming, and virtual portfolio trading.
+PixelFund AI is a pixel-art themed stock trading simulation web app with specialist AI agents, realtime quote streaming, and virtual portfolio trading.
 
 ## Quickstart
 
