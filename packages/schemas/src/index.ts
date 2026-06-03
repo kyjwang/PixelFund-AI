@@ -9,13 +9,18 @@ export const agentTypeSchema = z.enum([
   "NEWS_ANALYST",
   "FUNDAMENTALS_ANALYST",
   "RISK_ANALYST",
+  "MACRO_ANALYST",
+  "SENTIMENT_ANALYST",
+  "QUANT_ANALYST",
+  "CRYPTO_SPECIALIST",
   "BULL_RESEARCHER",
   "BEAR_RESEARCHER",
   "TRADER_AGENT",
   "AGGRESSIVE_RISK",
   "NEUTRAL_RISK",
   "CONSERVATIVE_RISK",
-  "PORTFOLIO_MANAGER"
+  "PORTFOLIO_MANAGER",
+  "TEAM_LEAD"
 ]);
 
 export const quoteSchema = z.object({
@@ -147,7 +152,31 @@ export const stockHistorySchema = z.object({
 export const tradeCreateSchema = z.object({
   ticker: tickerSchema,
   side: z.enum(["BUY", "SELL"]),
-  quantity: z.number().int().positive()
+  quantity: z.number().int().positive(),
+  orderType: z.enum(["MARKET", "LIMIT", "STOP"]).default("MARKET"),
+  limitPrice: z.number().positive().optional(),
+  stopPrice: z.number().positive().optional()
+});
+
+export const tradePreviewSchema = z.object({
+  ticker: tickerSchema,
+  side: z.enum(["BUY", "SELL"]),
+  quantity: z.number().int().positive(),
+  orderType: z.enum(["MARKET", "LIMIT", "STOP"]),
+  currentPrice: z.number().nonnegative(),
+  estimatedPrice: z.number().nonnegative(),
+  estimatedGross: z.number().nonnegative(),
+  projectedCash: z.number(),
+  projectedShares: z.number().int().nonnegative(),
+  executableNow: z.boolean(),
+  sizingHint: z.object({
+    maxAffordableShares: z.number().int().nonnegative(),
+    currentExposurePercent: z.number().nonnegative(),
+    projectedExposurePercent: z.number().nonnegative(),
+    suggestedMaxShares: z.number().int().nonnegative(),
+    message: z.string()
+  }),
+  warnings: z.array(z.string())
 });
 
 export const analysisRunCreateSchema = z.object({
@@ -192,13 +221,18 @@ export const portfolioPositionSchema = z.object({
   averageCost: z.number().nonnegative(),
   marketPrice: z.number().nonnegative(),
   marketValue: z.number().nonnegative(),
-  unrealizedPnl: z.number()
+  unrealizedPnl: z.number(),
+  unrealizedPnlPercent: z.number(),
+  costBasis: z.number().nonnegative(),
+  portfolioWeight: z.number().nonnegative()
 });
 
 export const portfolioSchema = z.object({
+  accountKey: z.string(),
   cash: z.number(),
   totalValue: z.number(),
   totalPnl: z.number(),
+  totalPnlPercent: z.number(),
   realizedPnl: z.number(),
   totalUnrealizedPnl: z.number(),
   positions: z.array(portfolioPositionSchema)
@@ -210,6 +244,8 @@ export const tradeSchema = z.object({
   side: z.enum(["BUY", "SELL"]),
   quantity: z.number().int().positive(),
   price: z.number().nonnegative(),
+  orderType: z.enum(["MARKET", "LIMIT", "STOP"]).optional(),
+  requestedPrice: z.number().nullable().optional(),
   createdAt: z.coerce.string()
 });
 
@@ -295,5 +331,6 @@ export type ProviderCapabilities = z.infer<typeof providerCapabilitiesSchema>;
 export type Portfolio = z.infer<typeof portfolioSchema>;
 export type Trade = z.infer<typeof tradeSchema>;
 export type TradeCreateInput = z.infer<typeof tradeCreateSchema>;
+export type TradePreview = z.infer<typeof tradePreviewSchema>;
 export type AnalysisRun = z.infer<typeof analysisRunSchema>;
 export type AgentResult = z.infer<typeof agentResultSchema>;

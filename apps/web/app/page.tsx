@@ -10,6 +10,7 @@ import {
   marketContextSchema,
   portfolioSchema,
   quoteSchema,
+  tradePreviewSchema,
   tradeSchema,
   watchlistItemSchema,
   wsQuoteStaleSchema
@@ -45,6 +46,7 @@ type Quote = z.infer<typeof quoteSchema>;
 type MarketContext = z.infer<typeof marketContextSchema>;
 type Trade = z.infer<typeof tradeSchema>;
 type BacktestResult = z.infer<typeof backtestResultSchema>;
+type TradePreview = z.infer<typeof tradePreviewSchema>;
 
 export default function HomePage() {
   const [ticker, setTicker] = useState("AAPL");
@@ -62,6 +64,11 @@ export default function HomePage() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
+  const [previewSide, setPreviewSide] = useState<"BUY" | "SELL">("BUY");
+  const [limitPrice, setLimitPrice] = useState<number | "">("");
+  const [stopPrice, setStopPrice] = useState<number | "">("");
+  const [tradePreview, setTradePreview] = useState<TradePreview | null>(null);
   const [quoteStale, setQuoteStale] = useState(false);
   const [backtest, setBacktest] = useState<BacktestResult | null>(null);
   const [isBacktesting, setIsBacktesting] = useState(false);
@@ -209,6 +216,29 @@ export default function HomePage() {
     if (socketRef.current?.connected) subscribeTickers(socketRef.current, ticker, watchlist);
   }, [ticker, watchlist]);
 
+  useEffect(() => {
+    const normalized = ticker.trim().toUpperCase();
+    if (!normalized || !quote) return;
+    const controller = new AbortController();
+    const id = setTimeout(async () => {
+      try {
+        const preview = await api("/trades/preview", tradePreviewSchema, {
+          method: "POST",
+          signal: controller.signal,
+          body: JSON.stringify(tradePayload(previewSide))
+        });
+        setTradePreview(preview);
+      } catch {
+        setTradePreview(null);
+      }
+    }, 180);
+
+    return () => {
+      controller.abort();
+      clearTimeout(id);
+    };
+  }, [ticker, quantity, orderType, limitPrice, stopPrice, previewSide, quote?.price, portfolio?.cash]);
+
   const latest = useMemo(
     () => runs.find((run) => run.ticker === ticker.toUpperCase()) ?? runs[0],
     [runs, ticker]
@@ -252,6 +282,21 @@ export default function HomePage() {
     [latest]
   );
 
+  const completedCommittee = useMemo(
+    () => (latest?.recommendations ?? []).filter((r) => r.status === "COMPLETED" && r.agentType !== "PORTFOLIO_MANAGER"),
+    [latest]
+  );
+
+  const voteMix = useMemo(() => {
+    const mix = { BUY: 0, HOLD: 0, AVOID: 0 };
+    for (const rec of completedCommittee) {
+      if (rec.recommendation === "BUY" || rec.recommendation === "HOLD" || rec.recommendation === "AVOID") {
+        mix[rec.recommendation] += 1;
+      }
+    }
+    return mix;
+  }, [completedCommittee]);
+
   const agentStatuses = useMemo(() => {
     const map: Record<string, string | undefined> = {};
     for (const rec of latest?.recommendations ?? []) map[rec.agentType] = rec.status;
@@ -272,7 +317,7 @@ export default function HomePage() {
   );
 
   const tradeEstimate = useMemo(() => {
-    const px = quote?.price ?? 0;
+    const px = tradePreview?.estimatedPrice ?? quote?.price ?? 0;
     const qty = Math.max(1, quantity);
     const gross = px * qty;
     return {
@@ -281,7 +326,7 @@ export default function HomePage() {
       projectedCashBuy: (portfolio?.cash ?? 0) - gross,
       projectedCashSell: (portfolio?.cash ?? 0) + gross
     };
-  }, [quote?.price, quantity, portfolio?.cash]);
+  }, [quote?.price, quantity, portfolio?.cash, tradePreview?.estimatedPrice]);
 
   async function selectTicker(symbol: string) {
     const normalized = symbol.toUpperCase();
@@ -294,7 +339,7 @@ export default function HomePage() {
     try {
       const updated = await api("/trades", portfolioSchema, {
         method: "POST",
-        body: JSON.stringify({ ticker, side, quantity: tradeEstimate.qty })
+        body: JSON.stringify(tradePayload(side))
       });
       setPortfolio(updated);
       await refresh(ticker);
@@ -302,6 +347,17 @@ export default function HomePage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Trade failed");
     }
+  }
+
+  function tradePayload(side: "BUY" | "SELL") {
+    return {
+      ticker,
+      side,
+      quantity: tradeEstimate.qty,
+      orderType,
+      ...(orderType === "LIMIT" && typeof limitPrice === "number" ? { limitPrice } : {}),
+      ...(orderType === "STOP" && typeof stopPrice === "number" ? { stopPrice } : {})
+    };
   }
 
   async function runAnalysis(targetTicker = tickerRef.current) {
@@ -573,16 +629,91 @@ export default function HomePage() {
                   className="h-10 w-full border-2 border-black px-2 text-sm"
                 />
               </div>
+              <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                <label className="grid gap-1 font-semibold" htmlFor="order-type-input">
+                  Order
+                  <select
+                    id="order-type-input"
+                    value={orderType}
+                    onChange={(e) => setOrderType(e.target.value as "MARKET" | "LIMIT" | "STOP")}
+                    className="h-10 border-2 border-black bg-white px-2 text-sm"
+                  >
+                    <option value="MARKET">Market</option>
+                    <option value="LIMIT">Limit</option>
+                    <option value="STOP">Stop</option>
+                  </select>
+                </label>
+                {orderType === "LIMIT" ? (
+                  <label className="grid gap-1 font-semibold" htmlFor="limit-price-input">
+                    Limit
+                    <input
+                      id="limit-price-input"
+                      type="number"
+                      min={0.01}
+                      step={0.01}
+                      value={limitPrice}
+                      placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"}
+                      onChange={(e) => setLimitPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="h-10 border-2 border-black px-2 text-sm"
+                    />
+                  </label>
+                ) : null}
+                {orderType === "STOP" ? (
+                  <label className="grid gap-1 font-semibold" htmlFor="stop-price-input">
+                    Stop
+                    <input
+                      id="stop-price-input"
+                      type="number"
+                      min={0.01}
+                      step={0.01}
+                      value={stopPrice}
+                      placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"}
+                      onChange={(e) => setStopPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="h-10 border-2 border-black px-2 text-sm"
+                    />
+                  </label>
+                ) : null}
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  className={`h-9 border-2 border-black px-3 text-xs font-semibold ${previewSide === "BUY" ? "bg-emerald-200" : "bg-white"}`}
+                  onClick={() => setPreviewSide("BUY")}
+                >
+                  Preview Buy
+                </button>
+                <button
+                  className={`h-9 border-2 border-black px-3 text-xs font-semibold ${previewSide === "SELL" ? "bg-slate-200" : "bg-white"}`}
+                  onClick={() => setPreviewSide("SELL")}
+                >
+                  Preview Sell
+                </button>
+              </div>
               <div className="mt-3 grid gap-1 text-xs">
                 <p>Estimated cost/proceeds: {formatMoney(tradeEstimate.gross)}</p>
                 <p>Projected cash after buy: {formatMoney(tradeEstimate.projectedCashBuy)}</p>
                 <p>Projected cash after sell: {formatMoney(tradeEstimate.projectedCashSell)}</p>
+                {tradePreview ? (
+                  <>
+                    <p>Trigger status: {tradePreview.executableNow ? "Executable now" : "Waiting for trigger"}</p>
+                    <p>{tradePreview.sizingHint.message}</p>
+                    <p>Projected exposure: {formatSignedPercent(tradePreview.sizingHint.projectedExposurePercent)}</p>
+                  </>
+                ) : null}
               </div>
+              {(tradePreview?.warnings ?? []).length > 0 ? (
+                <div className="mt-3 grid gap-1">
+                  {tradePreview?.warnings.map((warning) => (
+                    <p key={warning} className="border border-amber-900 bg-amber-100 px-2 py-1 text-xs text-amber-950">
+                      {warning}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button className="h-11 border-2 border-black bg-[#1b4332] px-3 text-xs font-semibold text-white" onClick={() => void placeTrade("BUY")}>
+                <button className="h-11 border-2 border-black bg-[#1b4332] px-3 text-xs font-semibold text-white" onClick={() => { setPreviewSide("BUY"); void placeTrade("BUY"); }}>
                   Buy {tradeEstimate.qty}
                 </button>
-                <button className="h-11 border-2 border-black bg-[#2f4858] px-3 text-xs font-semibold text-white" onClick={() => void placeTrade("SELL")}>
+                <button className="h-11 border-2 border-black bg-[#2f4858] px-3 text-xs font-semibold text-white" onClick={() => { setPreviewSide("SELL"); void placeTrade("SELL"); }}>
                   Sell {tradeEstimate.qty}
                 </button>
               </div>
@@ -633,13 +764,37 @@ export default function HomePage() {
               <p>Status: {dataQualityStatus} | Provider: {marketContext?.dataQuality.provider ?? "loading"} | Score: {Math.round(dataQuality * 100)}%</p>
               <p>{marketContext?.dataQuality.messages[0] ?? "Evidence status will appear after market data loads."}</p>
             </div>
+            <div className="mt-3 grid gap-2 border-2 border-black bg-[#f7fff7] p-2 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold">Manager Weighting</p>
+                <span>{completedCommittee.length}/14 agents complete</span>
+              </div>
+              <p>Votes: {voteMix.BUY} BUY | {voteMix.HOLD} HOLD | {voteMix.AVOID} AVOID</p>
+              <div className="grid gap-1 sm:grid-cols-2">
+                {completedCommittee.slice(0, 6).map((rec) => (
+                  <button
+                    key={rec.id}
+                    className="grid grid-cols-[1fr_auto] gap-2 border border-black bg-white px-2 py-1 text-left hover:bg-[#d9f0e8]"
+                    onClick={() => setSelectedAgent(rec.agentType)}
+                  >
+                    <span className="truncate">{agentLabel(rec.agentType)}</span>
+                    <span className="font-semibold">{rec.recommendation ?? rec.status} {typeof rec.confidence === "number" ? `${Math.round(rec.confidence * 100)}%` : ""}</span>
+                  </button>
+                ))}
+              </div>
+              {(portfolioManager?.reasons ?? []).slice(0, 3).map((reason, idx) => (
+                <EvidenceReason key={`pm-weight-${idx}`} reason={reason} />
+              ))}
+            </div>
           </section>
 
           <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
             <h2 className="font-pixel text-[10px] sm:text-xs">Portfolio</h2>
+            <p className="mt-2 truncate text-xs text-slate-600">Demo account: {portfolio?.accountKey ?? "loading"}</p>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
               <Metric label="Cash" value={formatMoney(portfolio?.cash ?? 0)} />
               <Metric label="Total Value" value={formatMoney(portfolio?.totalValue ?? 0)} />
+              <Metric label="Total P&L" value={`${formatMoney(portfolio?.totalPnl ?? 0)} (${formatSignedPercent(portfolio?.totalPnlPercent ?? 0)})`} tone={(portfolio?.totalPnl ?? 0) >= 0 ? "good" : "bad"} />
               <Metric label="Realized P&L" value={formatMoney(portfolio?.realizedPnl ?? 0)} tone={(portfolio?.realizedPnl ?? 0) >= 0 ? "good" : "bad"} />
               <Metric label="Unrealized P&L" value={formatMoney(portfolio?.totalUnrealizedPnl ?? 0)} tone={(portfolio?.totalUnrealizedPnl ?? 0) >= 0 ? "good" : "bad"} />
             </div>
@@ -652,8 +807,8 @@ export default function HomePage() {
                     <button className="text-left font-semibold" onClick={() => void selectTicker(p.ticker)}>
                       {p.ticker}
                     </button>
-                    <span>{p.quantity} sh @ {formatMoney(p.averageCost)}</span>
-                    <span className={ret >= 0 ? "text-emerald-800" : "text-red-800"}>{formatSignedPercent(ret)}</span>
+                    <span>{p.quantity} sh @ {formatMoney(p.averageCost)} | {formatSignedPercent(p.portfolioWeight)} weight</span>
+                    <span className={ret >= 0 ? "text-emerald-800" : "text-red-800"}>{formatSignedPercent(p.unrealizedPnlPercent)}</span>
                   </div>
                 );
               })}
@@ -778,7 +933,7 @@ export default function HomePage() {
                 <div key={trade.id} className="grid grid-cols-[52px_58px_1fr] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
                   <span className={trade.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-slate-800"}>{trade.side}</span>
                   <span>{trade.ticker}</span>
-                  <span className="text-right">{trade.quantity} @ {formatMoney(trade.price)}</span>
+                  <span className="text-right">{trade.quantity} @ {formatMoney(trade.price)} {trade.orderType ? `(${trade.orderType})` : ""}</span>
                 </div>
               ))}
               {trades.length === 0 ? <p className="p-2 text-xs text-slate-600">No trades yet.</p> : null}

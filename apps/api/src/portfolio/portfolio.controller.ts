@@ -1,4 +1,4 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Headers } from "@nestjs/common";
 import { PortfolioService } from "./portfolio.service";
 
 @Controller("portfolio")
@@ -6,7 +6,7 @@ export class PortfolioController {
   constructor(private readonly portfolio: PortfolioService) {}
 
   @Get()
-  getPortfolio() {
-    return this.portfolio.getPortfolio();
+  getPortfolio(@Headers("x-demo-user-id") ownerKey?: string) {
+    return this.portfolio.getPortfolio(ownerKey);
   }
 }

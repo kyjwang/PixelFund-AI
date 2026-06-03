@@ -38,19 +38,34 @@
 
 ### `GET /portfolio`
 - Purpose: current demo account state
+- Header: optional `x-demo-user-id` isolates a browser/demo portfolio
 - Response: `{ data: Portfolio }`
-- Portfolio fields: `cash`, `totalValue`, `totalUnrealizedPnl`, `positions[]`
+- Portfolio fields: `accountKey`, `cash`, `totalValue`, `totalPnl`, `totalPnlPercent`, `realizedPnl`, `totalUnrealizedPnl`, `positions[]`
+
+### `POST /trades/preview`
+- Purpose: validate a virtual trade before execution
+- Header: optional `x-demo-user-id`
+- Request body:
+```json
+{ "ticker": "AAPL", "side": "BUY|SELL", "quantity": 1, "orderType": "MARKET|LIMIT|STOP", "limitPrice": 200, "stopPrice": 180 }
+```
+- Response: `{ data: TradePreview }`
+- Preview fields: `currentPrice`, `estimatedPrice`, `estimatedGross`, `projectedCash`, `projectedShares`, `executableNow`, `sizingHint`, `warnings[]`
 
 ### `POST /trades`
 - Purpose: place virtual trade
+- Header: optional `x-demo-user-id`
 - Request body:
 ```json
-{ "ticker": "AAPL", "side": "BUY|SELL", "quantity": 1 }
+{ "ticker": "AAPL", "side": "BUY|SELL", "quantity": 1, "orderType": "MARKET|LIMIT|STOP", "limitPrice": 200, "stopPrice": 180 }
 ```
 - Response: `{ data: Portfolio }` (updated)
 - Domain error codes:
   - `INSUFFICIENT_FUNDS`
   - `INSUFFICIENT_SHARES`
+  - `ORDER_NOT_TRIGGERED`
+  - `STALE_QUOTE`
+  - `UNSUPPORTED_MARKET_DATA`
 
 ### `GET /trades?limit={n}`
 - Purpose: recent virtual trade history

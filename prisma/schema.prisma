@@ -12,11 +12,21 @@ enum TradeSide {
   SELL
 }
 
+enum OrderType {
+  MARKET
+  LIMIT
+  STOP
+}
+
 enum AgentType {
   TECHNICAL_ANALYST
   NEWS_ANALYST
   FUNDAMENTALS_ANALYST
   RISK_ANALYST
+  MACRO_ANALYST
+  SENTIMENT_ANALYST
+  QUANT_ANALYST
+  CRYPTO_SPECIALIST
   BULL_RESEARCHER
   BEAR_RESEARCHER
   TRADER_AGENT
@@ -24,6 +34,7 @@ enum AgentType {
   NEUTRAL_RISK
   CONSERVATIVE_RISK
   PORTFOLIO_MANAGER
+  TEAM_LEAD
 }
 
 enum AgentStatus {
@@ -41,6 +52,7 @@ enum Recommendation {
 
 model DemoAccount {
   id        String      @id @default(cuid())
+  ownerKey  String      @unique @default("demo")
   cash      Float       @default(100000)
   realizedPnl Float     @default(0)
   positions Position[]
@@ -70,6 +82,8 @@ model Trade {
   side      TradeSide
   quantity  Int
   price     Float
+  orderType OrderType   @default(MARKET)
+  requestedPrice Float?
   createdAt DateTime    @default(now())
 }
 

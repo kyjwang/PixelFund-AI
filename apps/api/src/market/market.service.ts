@@ -5,6 +5,9 @@ import type { DataQualityStatus, MarketContext, Quote } from "./market.types";
 
 @Injectable()
 export class MarketService {
+  private quoteCache = new Map<string, { quote: Quote; cachedAt: number }>();
+  private contextCache = new Map<string, { context: MarketContext; cachedAt: number }>();
+
   constructor(private readonly provider: FinnhubProvider) {}
 
   get capabilities() {
@@ -40,8 +43,27 @@ export class MarketService {
     return this.provider.search(q);
   }
 
-  quote(ticker: string) {
-    return this.provider.getQuote(ticker);
+  async quote(ticker: string) {
+    const normalized = ticker.toUpperCase();
+    const quote = await this.provider.getQuote(normalized);
+    const cacheTtlMs = Number(process.env.MARKET_CACHE_TTL_MS ?? "900000");
+    const cached = this.quoteCache.get(normalized);
+
+    if (quote.source === "finnhub") {
+      this.quoteCache.set(normalized, { quote, cachedAt: Date.now() });
+      return quote;
+    }
+
+    if (cached && Date.now() - cached.cachedAt <= cacheTtlMs) {
+      return {
+        ...cached.quote,
+        source: `${cached.quote.source}-cache`,
+        updatedAt: cached.quote.updatedAt
+      };
+    }
+
+    this.quoteCache.set(normalized, { quote, cachedAt: Date.now() });
+    return quote;
   }
 
   subscribeQuotes(tickers: string[], onQuote: (quote: Quote) => void) {
@@ -81,6 +103,10 @@ export class MarketService {
 
   async context(ticker: string): Promise<MarketContext> {
     const normalized = ticker.toUpperCase();
+    const cacheTtlMs = Number(process.env.MARKET_CONTEXT_CACHE_TTL_MS ?? "120000");
+    const cached = this.contextCache.get(normalized);
+    if (cached && Date.now() - cached.cachedAt <= cacheTtlMs) return cached.context;
+
     const [quote, fundamentals, news, analystTrend, history] = await Promise.all([
       this.quote(normalized),
       this.fundamentals(normalized),
@@ -116,7 +142,7 @@ export class MarketService {
       (hasAnalystTrend ? 0.1 : 0.03) +
       (hasHistory ? 0.05 : 0.01);
 
-    return {
+    const context = {
       ticker: normalized,
       quote,
       fundamentals,
@@ -136,6 +162,8 @@ export class MarketService {
         messages: [...messagesForStatus(status, normalized), ...warnings]
       }
     };
+    this.contextCache.set(normalized, { context, cachedAt: Date.now() });
+    return context;
   }
 }
 

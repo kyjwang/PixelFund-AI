@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Post, Query } from "@nestjs/common";
 import { tradeCreateSchema } from "@pixelfund/schemas";
 import { TradesService } from "./trades.service";
 
@@ -6,10 +6,16 @@ import { TradesService } from "./trades.service";
 export class TradesController {
   constructor(private readonly trades: TradesService) {}
 
-  @Post()
-  async createTrade(@Body() body: unknown) {
+  @Post("preview")
+  async previewTrade(@Body() body: unknown, @Headers("x-demo-user-id") ownerKey?: string) {
     const payload = tradeCreateSchema.parse(body);
-    return this.trades.placeTrade(payload);
+    return this.trades.previewTrade(payload, ownerKey);
+  }
+
+  @Post()
+  async createTrade(@Body() body: unknown, @Headers("x-demo-user-id") ownerKey?: string) {
+    const payload = tradeCreateSchema.parse(body);
+    return this.trades.placeTrade(payload, ownerKey);
   }
 
   @Get()

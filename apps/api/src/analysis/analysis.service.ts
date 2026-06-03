@@ -10,12 +10,16 @@ const specialists = [
   "TECHNICAL_ANALYST",
   "NEWS_ANALYST",
   "FUNDAMENTALS_ANALYST",
-  "RISK_ANALYST"
+  "RISK_ANALYST",
+  "MACRO_ANALYST",
+  "SENTIMENT_ANALYST",
+  "QUANT_ANALYST",
+  "CRYPTO_SPECIALIST"
 ] as const;
 
 const debateAgents = ["BULL_RESEARCHER", "BEAR_RESEARCHER"] as const;
 const riskCouncil = ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"] as const;
-const pipelineAgents = [...specialists, ...debateAgents, "TRADER_AGENT", ...riskCouncil] as const;
+const pipelineAgents = [...specialists, ...debateAgents, "TRADER_AGENT", ...riskCouncil, "TEAM_LEAD"] as const;
 
 @Injectable()
 export class AnalysisService {

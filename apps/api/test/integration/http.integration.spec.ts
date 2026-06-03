@@ -82,10 +82,15 @@ describe("http integration", () => {
         "BULL_RESEARCHER",
         "CONSERVATIVE_RISK",
         "FUNDAMENTALS_ANALYST",
+        "MACRO_ANALYST",
+        "SENTIMENT_ANALYST",
+        "QUANT_ANALYST",
+        "CRYPTO_SPECIALIST",
         "NEUTRAL_RISK",
         "NEWS_ANALYST",
         "PORTFOLIO_MANAGER",
         "RISK_ANALYST",
+        "TEAM_LEAD",
         "TECHNICAL_ANALYST",
         "TRADER_AGENT"
       ].sort()
@@ -103,6 +108,16 @@ describe("http integration", () => {
     const afterSell = await request(server).get("/portfolio").expect(200);
     const parsedSell = portfolioSchema.parse(afterSell.body.data);
     expect(parsedSell.positions.find((p) => p.ticker === "MSFT")?.quantity).toBe(1);
+  });
+
+  test("trade preview returns sizing and trigger status", async () => {
+    const res = await request(server)
+      .post("/trades/preview")
+      .send({ ticker: "AAPL", side: "BUY", quantity: 1, orderType: "LIMIT", limitPrice: 999999 })
+      .expect(201);
+
+    expect(res.body.data.executableNow).toBe(true);
+    expect(res.body.data.sizingHint.maxAffordableShares).toBeGreaterThan(0);
   });
 
   test("quote endpoint returns schema-valid payload envelope", async () => {

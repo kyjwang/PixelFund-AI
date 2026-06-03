@@ -26,15 +26,19 @@ npm run dev
 ## Current Status
 ### Working now
 - Pixel office UI and mobile-responsive experience
-- Virtual buy/sell portfolio flow
-- Analysis run lifecycle with specialist + manager outputs
+- Virtual buy/sell portfolio flow with market/limit/stop preview checks
+- Browser-isolated demo accounts via `x-demo-user-id`
+- Full investment committee lifecycle with specialist, debate, risk council, team lead, and manager outputs
 - Realtime websocket quote and lifecycle events
+- Trade sizing hints, richer P&L analytics, and recommendation explainability
+- Market-data cache fallback for degraded provider moments
 - Shared schema and domain packages
 - CI workflow and test suite foundation
 
 ### Planned hardening
 - Expanded true integration tests against live DB/Redis in CI
 - Deeper observability/monitoring and deployment readiness
+- Production auth provider and durable pending-order simulation
 - Continuous docs-to-code drift prevention improvements
 
 ## Documentation Index

@@ -5,6 +5,7 @@ import { PortfolioService } from "../portfolio/portfolio.service";
 import { applyTrade } from "@pixelfund/domain";
 import { EventsGateway } from "../ws/events.gateway";
 import { DomainError } from "../common/errors/domain.error";
+import type { TradeCreateInput } from "@pixelfund/schemas";
 
 @Injectable()
 export class TradesService {
@@ -15,13 +16,69 @@ export class TradesService {
     private readonly events: EventsGateway
   ) {}
 
-  async placeTrade(input: { ticker: string; side: "BUY" | "SELL"; quantity: number }) {
+  async previewTrade(input: TradeCreateInput, ownerKey?: string) {
     const ticker = input.ticker.toUpperCase();
-    const account = await this.portfolio.getOrCreateAccount();
+    const account = await this.portfolio.getOrCreateAccount(ownerKey);
+    const quote = await this.market.quote(ticker);
+    const portfolio = await this.portfolio.getPortfolio(ownerKey);
+    const activePosition = portfolio.positions.find((p) => p.ticker === ticker);
+    const requestedPrice = requestedOrderPrice(input);
+    const estimatedPrice = requestedPrice ?? quote.price;
+    const estimatedGross = estimatedPrice * input.quantity;
+    const currentShares = activePosition?.quantity ?? 0;
+    const projectedCash = input.side === "BUY" ? account.cash - estimatedGross : account.cash + estimatedGross;
+    const projectedShares = input.side === "BUY" ? currentShares + input.quantity : Math.max(0, currentShares - input.quantity);
+    const executableNow = orderExecutable(input, quote.price);
+    const maxAffordableShares = estimatedPrice > 0 ? Math.floor(account.cash / estimatedPrice) : 0;
+    const projectedPositionValue = projectedShares * quote.price;
+    const currentExposurePercent = activePosition?.portfolioWeight ?? 0;
+    const projectedTotalValue = input.side === "BUY" ? portfolio.totalValue : Math.max(0, portfolio.totalValue);
+    const projectedExposurePercent = projectedTotalValue > 0 ? (projectedPositionValue / projectedTotalValue) * 100 : 0;
+    const suggestedMaxShares = quote.price > 0 ? Math.floor((portfolio.totalValue * 0.1) / quote.price) : 0;
+    const warnings: string[] = [];
+
+    if (quote.source === "unsupported") warnings.push("Live market data is unsupported for this ticker by the current provider.");
+    if (input.side === "BUY" && account.cash < estimatedGross) warnings.push("Insufficient virtual cash for this order.");
+    if (input.side === "SELL" && currentShares < input.quantity) warnings.push("Insufficient shares for this sell order.");
+    if (!executableNow) warnings.push(`${input.orderType} order is valid as a plan, but it would not execute at the current quote.`);
+    if (projectedExposurePercent > 15) warnings.push("Projected ticker exposure is above the 15% concentration guardrail.");
+
+    return {
+      ticker,
+      side: input.side,
+      quantity: input.quantity,
+      orderType: input.orderType,
+      currentPrice: quote.price,
+      estimatedPrice,
+      estimatedGross,
+      projectedCash,
+      projectedShares,
+      executableNow,
+      sizingHint: {
+        maxAffordableShares,
+        currentExposurePercent,
+        projectedExposurePercent,
+        suggestedMaxShares,
+        message:
+          input.side === "BUY"
+            ? `A 10% portfolio cap suggests up to ${suggestedMaxShares} share${suggestedMaxShares === 1 ? "" : "s"} at the current quote.`
+            : `Selling ${input.quantity} share${input.quantity === 1 ? "" : "s"} would leave ${projectedShares} share${projectedShares === 1 ? "" : "s"}.`
+      },
+      warnings
+    };
+  }
+
+  async placeTrade(input: TradeCreateInput, ownerKey?: string) {
+    const ticker = input.ticker.toUpperCase();
+    const account = await this.portfolio.getOrCreateAccount(ownerKey);
     const currentPositions = await this.prisma.position.findMany({ where: { accountId: account.id } });
     const quote = await this.market.quote(ticker);
+    const preview = await this.previewTrade(input, ownerKey);
     if (quote.source === "unsupported") {
       throw new DomainError("UNSUPPORTED_MARKET_DATA", "Live market data is unsupported for this ticker by the current provider.");
+    }
+    if (!preview.executableNow) {
+      throw new DomainError("ORDER_NOT_TRIGGERED", "This limit/stop order would not execute at the current quote.");
     }
     const staleMs = Number(process.env.QUOTE_STALE_MS ?? "20000");
     if (quote.source !== "finnhub" && Date.now() - new Date(quote.updatedAt).getTime() > staleMs) {
@@ -63,12 +120,14 @@ export class TradesService {
           ticker,
           side: input.side,
           quantity: input.quantity,
-          price: quote.price
+          price: quote.price,
+          orderType: input.orderType,
+          requestedPrice: requestedOrderPrice(input)
         }
       });
     });
 
-    const portfolio = await this.portfolio.getPortfolio();
+    const portfolio = await this.portfolio.getPortfolio(ownerKey);
     this.events.emit("portfolio.updated", portfolio);
     return portfolio;
   }
@@ -80,4 +139,20 @@ export class TradesService {
       take: Math.min(Math.max(safeLimit, 1), 100)
     });
   }
+}
+
+function requestedOrderPrice(input: TradeCreateInput) {
+  if (input.orderType === "LIMIT") return input.limitPrice;
+  if (input.orderType === "STOP") return input.stopPrice;
+  return undefined;
+}
+
+function orderExecutable(input: TradeCreateInput, currentPrice: number) {
+  if (input.orderType === "MARKET") return true;
+  if (input.orderType === "LIMIT") {
+    if (!input.limitPrice) return false;
+    return input.side === "BUY" ? currentPrice <= input.limitPrice : currentPrice >= input.limitPrice;
+  }
+  if (!input.stopPrice) return false;
+  return input.side === "BUY" ? currentPrice >= input.stopPrice : currentPrice <= input.stopPrice;
 }

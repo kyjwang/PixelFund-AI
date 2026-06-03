@@ -34,7 +34,11 @@ export class AnalysisProcessor extends WorkerHost {
         "TECHNICAL_ANALYST",
         "NEWS_ANALYST",
         "FUNDAMENTALS_ANALYST",
-        "RISK_ANALYST"
+        "RISK_ANALYST",
+        "MACRO_ANALYST",
+        "SENTIMENT_ANALYST",
+        "QUANT_ANALYST",
+        "CRYPTO_SPECIALIST"
       ] as const;
       const debateAgents = ["BULL_RESEARCHER", "BEAR_RESEARCHER"] as const;
       const riskCouncil = ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"] as const;
@@ -43,6 +47,7 @@ export class AnalysisProcessor extends WorkerHost {
       for (const agent of debateAgents) await this.runAgent(analysisRunId, agent, ticker, context);
       await this.runAgent(analysisRunId, "TRADER_AGENT", ticker, context);
       for (const agent of riskCouncil) await this.runAgent(analysisRunId, agent, ticker, context);
+      await this.runAgent(analysisRunId, "TEAM_LEAD", ticker, context);
 
       await this.analysis.finalizeManager(analysisRunId);
     } catch (error) {

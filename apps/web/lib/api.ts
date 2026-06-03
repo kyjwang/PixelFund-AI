@@ -6,11 +6,12 @@ const successEnvelopeSchema = <T extends z.ZodTypeAny>(schema: T) =>
   z.object({ data: schema });
 
 export async function api<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
+  const demoUserId = demoAccountKey();
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       ...init,
-      headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+      headers: { "content-type": "application/json", "x-demo-user-id": demoUserId, ...(init?.headers ?? {}) },
       cache: "no-store"
     });
   } catch {
@@ -25,4 +26,13 @@ export async function api<T>(path: string, schema: z.ZodType<T>, init?: RequestI
 
   const parsed = successEnvelopeSchema(schema).parse(json);
   return parsed.data as T;
+}
+
+function demoAccountKey() {
+  if (typeof window === "undefined") return "demo";
+  const existing = window.localStorage.getItem("pixelfund.demoUserId");
+  if (existing) return existing;
+  const created = `demo-${crypto.randomUUID()}`;
+  window.localStorage.setItem("pixelfund.demoUserId", created);
+  return created;
 }

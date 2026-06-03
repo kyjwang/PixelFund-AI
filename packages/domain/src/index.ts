@@ -13,13 +13,18 @@ export type AnalysisAgentType =
   | "NEWS_ANALYST"
   | "FUNDAMENTALS_ANALYST"
   | "RISK_ANALYST"
+  | "MACRO_ANALYST"
+  | "SENTIMENT_ANALYST"
+  | "QUANT_ANALYST"
+  | "CRYPTO_SPECIALIST"
   | "BULL_RESEARCHER"
   | "BEAR_RESEARCHER"
   | "TRADER_AGENT"
   | "AGGRESSIVE_RISK"
   | "NEUTRAL_RISK"
   | "CONSERVATIVE_RISK"
-  | "PORTFOLIO_MANAGER";
+  | "PORTFOLIO_MANAGER"
+  | "TEAM_LEAD";
 
 export type AgentAnalysisOutput = {
   summary: string;
@@ -229,6 +234,14 @@ export function buildAgentAnalysis(agentType: AnalysisAgentType, ticker: string,
       return fundamentalsAnalysis(ticker, context);
     case "RISK_ANALYST":
       return riskAnalysis(ticker, context);
+    case "MACRO_ANALYST":
+      return macroAnalysis(ticker, context);
+    case "SENTIMENT_ANALYST":
+      return sentimentAnalysis(ticker, context);
+    case "QUANT_ANALYST":
+      return quantAnalysis(ticker, context);
+    case "CRYPTO_SPECIALIST":
+      return cryptoSpecialistAnalysis(ticker, context);
     case "BULL_RESEARCHER":
       return bullResearch(ticker, context, evidence);
     case "BEAR_RESEARCHER":
@@ -249,6 +262,8 @@ export function buildAgentAnalysis(agentType: AnalysisAgentType, ticker: string,
         summary: `Portfolio Manager is waiting for specialist evidence on ${ticker}.`,
         reasons: ["Specialist analysis has not completed yet."]
       };
+    case "TEAM_LEAD":
+      return teamLeadSummary(ticker, context, evidence);
     default:
       return exhaustive(agentType);
   }
@@ -273,13 +288,18 @@ export function aggregatePortfolioManager(
     NEWS_ANALYST: 0.2,
     FUNDAMENTALS_ANALYST: 0.3,
     RISK_ANALYST: 0.24,
+    MACRO_ANALYST: 0.12,
+    SENTIMENT_ANALYST: 0.1,
+    QUANT_ANALYST: 0.16,
+    CRYPTO_SPECIALIST: 0.06,
     BULL_RESEARCHER: 0.12,
     BEAR_RESEARCHER: 0.12,
     TRADER_AGENT: 0.2,
     AGGRESSIVE_RISK: 0.08,
     NEUTRAL_RISK: 0.1,
     CONSERVATIVE_RISK: 0.12,
-    PORTFOLIO_MANAGER: 0
+    PORTFOLIO_MANAGER: 0,
+    TEAM_LEAD: 0
   };
 
   let totalWeight = 0;
@@ -319,7 +339,7 @@ export function aggregatePortfolioManager(
 
   const recommendation = recommendationFromScore(score);
   const averageConfidence = completed.reduce((sum, s) => sum + (s.confidence ?? 0.5), 0) / completed.length;
-  const coverage = clamp(completed.length / 10, 0, 1);
+  const coverage = clamp(completed.length / 14, 0, 1);
   const confidence = clamp(0.35 + averageConfidence * 0.45 + coverage * 0.2, 0.45, 0.9);
   const conflict = new Set(completed.map((s) => s.recommendation)).size > 1;
 
@@ -327,11 +347,11 @@ export function aggregatePortfolioManager(
     score: round(score, 1),
     confidence: round(confidence, 2),
     recommendation,
-    summary: `Portfolio Manager ${recommendation === "BUY" ? "approves" : recommendation === "AVOID" ? "rejects" : "holds"} ${recommendation} with a ${Math.round(score)} composite score from ${completed.length}/10 agent opinions.`,
+    summary: `Portfolio Manager ${recommendation === "BUY" ? "approves" : recommendation === "AVOID" ? "rejects" : "holds"} ${recommendation} with a ${Math.round(score)} composite score from ${completed.length}/14 agent opinions.`,
     reasons: [
       ...reasons,
       conflict ? "Specialists disagreed, so confidence was moderated." : "Specialists were broadly aligned.",
-      coverage < 1 ? "Partial specialist coverage lowered confidence." : "All specialist outputs were available."
+      coverage < 1 ? "Partial investment-committee coverage lowered confidence." : "All investment-committee outputs were available."
     ]
   };
 }
@@ -535,6 +555,141 @@ function riskAnalysis(ticker: string, context: MarketContext): AgentAnalysisOutp
   return finishAgent(ticker, "Risk Analyst", "volatility, drawdown, valuation, and event-risk evidence", score, evidence, context.dataQuality.score, reasons);
 }
 
+function macroAnalysis(ticker: string, context: MarketContext): AgentAnalysisOutput {
+  const f = context.fundamentals;
+  const reasons: string[] = [];
+  let score = 50;
+  let evidence = 0;
+
+  if (isFiniteNumber(f.beta)) {
+    if (f.beta > 1.4) score -= 7;
+    else if (f.beta < 0.9) score += 4;
+    evidence += 1;
+    reasons.push(`[${f.source}] Beta of ${round(f.beta, 2)} sets the macro sensitivity baseline.`);
+  }
+
+  if (isFiniteNumber(context.technicals?.volatility30d)) {
+    const volatility = context.technicals.volatility30d;
+    if (volatility > 35) score -= 8;
+    else if (volatility < 18) score += 5;
+    evidence += 1;
+    reasons.push(`[${context.technicals.source}] 30-day volatility is ${formatPercent(volatility)}.`);
+  }
+
+  if (isFiniteNumber(f.revenueGrowth)) {
+    if (f.revenueGrowth > 10) score += 5;
+    if (f.revenueGrowth < 0) score -= 6;
+    evidence += 1;
+    reasons.push(`[${f.source}] Revenue growth suggests ${f.revenueGrowth >= 0 ? "cyclical resilience" : "cyclical pressure"}.`);
+  }
+
+  if (context.dataQuality.status === "LIVE" || context.dataQuality.status === "PARTIAL") {
+    score += 3;
+    reasons.push(`[${context.dataQuality.provider}] Macro read has usable provider coverage.`);
+  }
+
+  return finishAgent(ticker, "Macro Analyst", "beta, volatility, growth resilience, and provider coverage", score, evidence, context.dataQuality.score, reasons);
+}
+
+function sentimentAnalysis(ticker: string, context: MarketContext): AgentAnalysisOutput {
+  const reasons: string[] = [];
+  let score = 50;
+  let evidence = 0;
+
+  const sentimentScores = context.news.map((item) => item.sentimentScore ?? sentimentToScore(item.sentiment));
+  if (sentimentScores.length > 0) {
+    const average = sentimentScores.reduce((sum, value) => sum + value, 0) / sentimentScores.length;
+    score += average * 34;
+    evidence += Math.min(sentimentScores.length, 5) / 2;
+    reasons.push(`[news] Crowd/news tone is ${sentimentLabel(average)} across ${sentimentScores.length} headline${sentimentScores.length === 1 ? "" : "s"}.`);
+  }
+
+  if (context.analystTrend) {
+    score += context.analystTrend.consensus === "BUY" ? 6 : context.analystTrend.consensus === "AVOID" ? -6 : 0;
+    evidence += 1;
+    reasons.push(`[${context.analystTrend.source}] Analyst consensus contributes a ${context.analystTrend.consensus} sentiment anchor.`);
+  }
+
+  if (Math.abs(context.quote.changePercent) >= 2) {
+    score += clamp(context.quote.changePercent, -5, 5);
+    evidence += 1;
+    reasons.push(`[${context.quote.source}] Price reaction of ${formatPercent(context.quote.changePercent)} confirms sentiment intensity.`);
+  }
+
+  return finishAgent(ticker, "Sentiment Analyst", "headline tone, analyst consensus, and market reaction", score, evidence, context.dataQuality.score, reasons);
+}
+
+function quantAnalysis(ticker: string, context: MarketContext): AgentAnalysisOutput {
+  const f = context.fundamentals;
+  const reasons: string[] = [];
+  let score = 50;
+  let evidence = 0;
+
+  if (context.technicals?.trend === "UP") score += 10;
+  if (context.technicals?.trend === "DOWN") score -= 10;
+  if (context.technicals) {
+    evidence += 1;
+    reasons.push(`[${context.technicals.source}] Trend factor is ${context.technicals.trend.toLowerCase()}.`);
+  }
+
+  if (context.technicals?.volumeTrend === "RISING" && context.quote.changePercent > 0) score += 5;
+  if (context.technicals?.volumeTrend === "RISING" && context.quote.changePercent < 0) score -= 5;
+  if (context.technicals) {
+    evidence += 1;
+    reasons.push(`[${context.technicals.source}] Volume factor is ${context.technicals.volumeTrend.toLowerCase()}.`);
+  }
+
+  if (isFiniteNumber(f.forwardPe) && isFiniteNumber(f.revenueGrowth)) {
+    const growthAdjusted = f.forwardPe / Math.max(1, Math.abs(f.revenueGrowth));
+    if (growthAdjusted < 1.8) score += 7;
+    else if (growthAdjusted > 4) score -= 7;
+    evidence += 1;
+    reasons.push(`[${f.source}] Growth-adjusted valuation factor is ${round(growthAdjusted, 2)}.`);
+  }
+
+  if (isFiniteNumber(context.technicals?.maxDrawdown)) {
+    const drawdown = context.technicals.maxDrawdown;
+    if (drawdown > 30) score -= 6;
+    evidence += 1;
+    reasons.push(`[${context.technicals.source}] Max drawdown factor is ${formatPercent(drawdown)}.`);
+  }
+
+  return finishAgent(ticker, "Quant Analyst", "trend, volume, valuation, and drawdown factors", score, evidence, context.dataQuality.score, reasons);
+}
+
+function cryptoSpecialistAnalysis(ticker: string, context: MarketContext): AgentAnalysisOutput {
+  const reasons: string[] = [];
+  let score = 50;
+  let evidence = 0;
+
+  const symbol = ticker.toUpperCase();
+  const cryptoAdjacent = ["COIN", "MSTR", "MARA", "RIOT", "HOOD", "SQ", "PYPL", "TSLA"].includes(symbol);
+  if (cryptoAdjacent) {
+    score += context.quote.changePercent >= 0 ? 5 : -7;
+    evidence += 1;
+    reasons.push(`[liquidity] ${symbol} is crypto-adjacent, so risk-asset liquidity can amplify moves.`);
+  } else {
+    score += 1;
+    evidence += 0.5;
+    reasons.push("[liquidity] No direct crypto-beta flag; crypto liquidity is a secondary consideration.");
+  }
+
+  if (isFiniteNumber(context.technicals?.volatility30d)) {
+    const volatility = context.technicals.volatility30d;
+    if (volatility > 40) score -= 6;
+    else if (volatility < 22) score += 3;
+    evidence += 1;
+    reasons.push(`[${context.technicals.source}] Volatility read is ${formatPercent(volatility)}.`);
+  }
+
+  if (context.dataQuality.score < 0.7) {
+    score -= 4;
+    reasons.push("[data-quality] Thin evidence makes cross-asset liquidity signals less reliable.");
+  }
+
+  return finishAgent(ticker, "Crypto Specialist", "crypto-beta exposure, liquidity sensitivity, and volatility", score, evidence, context.dataQuality.score, reasons);
+}
+
 function bullResearch(ticker: string, context: MarketContext, evidence: AgentEvidence[]): AgentAnalysisOutput {
   const completed = completedEvidence(evidence);
   const reasons: string[] = [];
@@ -649,6 +804,32 @@ function riskCouncil(ticker: string, context: MarketContext, evidence: AgentEvid
   if (context.dataQuality.score < 0.65) reasons.push("[data-quality] Weak evidence requires smaller sizing or no trade.");
 
   return finishAgent(ticker, label, `${posture} critique of the trader plan`, score, 3, context.dataQuality.score, reasons);
+}
+
+function teamLeadSummary(ticker: string, context: MarketContext, evidence: AgentEvidence[]): AgentAnalysisOutput {
+  const completed = completedEvidence(evidence).filter((item) => item.agentType !== "TEAM_LEAD" && item.agentType !== "PORTFOLIO_MANAGER");
+  const score = scoreFromEvidence(completed, 50);
+  const recommendation = recommendationFromScore(score);
+  const buyCount = completed.filter((item) => item.recommendation === "BUY").length;
+  const holdCount = completed.filter((item) => item.recommendation === "HOLD").length;
+  const avoidCount = completed.filter((item) => item.recommendation === "AVOID").length;
+  const reasons = [
+    `[committee] Vote mix: ${buyCount} BUY, ${holdCount} HOLD, ${avoidCount} AVOID.`,
+    `[committee] Strongest current point: ${firstCompletedSummary(completed)}`,
+    `[data-quality] Evidence status is ${context.dataQuality.status} at ${Math.round(context.dataQuality.score * 100)}%.`
+  ];
+
+  if (new Set(completed.map((item) => item.recommendation)).size > 1) {
+    reasons.push("[committee] Disagreement remains, so final communication should name the main tradeoff.");
+  }
+
+  return {
+    score: round(clamp(score, 0, 100), 1),
+    confidence: round(clamp(0.4 + context.dataQuality.score * 0.22 + completed.length * 0.025, 0.4, 0.9), 2),
+    recommendation,
+    summary: `Team Lead summarizes ${ticker.toUpperCase()} as ${recommendation} after ${completed.length} committee inputs.`,
+    reasons
+  };
 }
 
 function finishAgent(
