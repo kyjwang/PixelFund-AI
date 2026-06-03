@@ -69,12 +69,28 @@ describe("http integration", () => {
       (resp) => {
         const runs = resp.body.data as Array<{ id: string; status: string; finalRec: string | null }>;
         const run = runs.find((r) => r.id === first.body.data.id);
-        return !!run && ["COMPLETED", "FAILED"].includes(run.status);
+        return !!run && run.status === "COMPLETED";
       }
     );
 
     const run = finished.body.data.find((r: any) => r.id === first.body.data.id);
     expect(() => analysisRunSchema.parse(run)).not.toThrow();
+    expect(run.recommendations.map((r: any) => r.agentType).sort()).toEqual(
+      [
+        "AGGRESSIVE_RISK",
+        "BEAR_RESEARCHER",
+        "BULL_RESEARCHER",
+        "CONSERVATIVE_RISK",
+        "FUNDAMENTALS_ANALYST",
+        "NEUTRAL_RISK",
+        "NEWS_ANALYST",
+        "PORTFOLIO_MANAGER",
+        "RISK_ANALYST",
+        "TECHNICAL_ANALYST",
+        "TRADER_AGENT"
+      ].sort()
+    );
+    expect(run.recommendations.find((r: any) => r.agentType === "TRADER_AGENT")?.summary).toBeTruthy();
   });
 
   test("trade updates portfolio accounting", async () => {

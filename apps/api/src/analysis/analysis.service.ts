@@ -13,6 +13,10 @@ const specialists = [
   "RISK_ANALYST"
 ] as const;
 
+const debateAgents = ["BULL_RESEARCHER", "BEAR_RESEARCHER"] as const;
+const riskCouncil = ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"] as const;
+const pipelineAgents = [...specialists, ...debateAgents, "TRADER_AGENT", ...riskCouncil] as const;
+
 @Injectable()
 export class AnalysisService {
   constructor(
@@ -46,7 +50,7 @@ export class AnalysisService {
         status: "PENDING",
         recommendations: {
           create: [
-            ...specialists.map((agentType) => ({ agentType, status: "PENDING" as AgentStatus })),
+            ...pipelineAgents.map((agentType) => ({ agentType, status: "PENDING" as AgentStatus })),
             { agentType: "PORTFOLIO_MANAGER", status: "PENDING" as AgentStatus }
           ]
         }

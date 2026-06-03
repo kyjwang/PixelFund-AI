@@ -10,6 +10,7 @@ const narrationSchema = z.object({
 });
 
 type Narration = z.infer<typeof narrationSchema>;
+const defaultPolishedAgents = new Set(["TECHNICAL_ANALYST", "NEWS_ANALYST", "FUNDAMENTALS_ANALYST", "RISK_ANALYST"]);
 
 function configured(value: string | undefined) {
   return Boolean(value && value.trim() && !value.startsWith("your_"));
@@ -76,6 +77,10 @@ export class AiService {
   }
 
   async analyze(agent: string, ticker: string, context: MarketContext, base: AgentAnalysisOutput): Promise<AgentAnalysisOutput> {
+    if (process.env.AI_POLISH_ALL_AGENTS !== "true" && !defaultPolishedAgents.has(agent)) {
+      return base;
+    }
+
     if (!this.client) {
       return {
         ...base,

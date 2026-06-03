@@ -13,6 +13,12 @@ export type AnalysisAgentType =
   | "NEWS_ANALYST"
   | "FUNDAMENTALS_ANALYST"
   | "RISK_ANALYST"
+  | "BULL_RESEARCHER"
+  | "BEAR_RESEARCHER"
+  | "TRADER_AGENT"
+  | "AGGRESSIVE_RISK"
+  | "NEUTRAL_RISK"
+  | "CONSERVATIVE_RISK"
   | "PORTFOLIO_MANAGER";
 
 export type AgentAnalysisOutput = {
@@ -21,6 +27,15 @@ export type AgentAnalysisOutput = {
   recommendation: Recommendation;
   reasons: string[];
   score: number;
+};
+
+type AgentEvidence = {
+  agentType: string;
+  recommendation?: Recommendation | string | null;
+  confidence?: number | null;
+  summary?: string | null;
+  status: string;
+  reasons?: unknown;
 };
 
 export function computeTechnicalIndicators(candles: HistoricalCandle[]): TechnicalIndicators {
@@ -204,7 +219,7 @@ export function aggregateRecommendation(
   return "HOLD";
 }
 
-export function buildAgentAnalysis(agentType: AnalysisAgentType, ticker: string, context: MarketContext): AgentAnalysisOutput {
+export function buildAgentAnalysis(agentType: AnalysisAgentType, ticker: string, context: MarketContext, evidence: AgentEvidence[] = []): AgentAnalysisOutput {
   switch (agentType) {
     case "TECHNICAL_ANALYST":
       return technicalAnalysis(ticker, context);
@@ -214,6 +229,18 @@ export function buildAgentAnalysis(agentType: AnalysisAgentType, ticker: string,
       return fundamentalsAnalysis(ticker, context);
     case "RISK_ANALYST":
       return riskAnalysis(ticker, context);
+    case "BULL_RESEARCHER":
+      return bullResearch(ticker, context, evidence);
+    case "BEAR_RESEARCHER":
+      return bearResearch(ticker, context, evidence);
+    case "TRADER_AGENT":
+      return traderPlan(ticker, context, evidence);
+    case "AGGRESSIVE_RISK":
+      return riskCouncil(ticker, context, evidence, "aggressive");
+    case "NEUTRAL_RISK":
+      return riskCouncil(ticker, context, evidence, "neutral");
+    case "CONSERVATIVE_RISK":
+      return riskCouncil(ticker, context, evidence, "conservative");
     case "PORTFOLIO_MANAGER":
       return {
         score: 50,
@@ -228,7 +255,7 @@ export function buildAgentAnalysis(agentType: AnalysisAgentType, ticker: string,
 }
 
 export function aggregatePortfolioManager(
-  specialist: Array<Pick<AgentResult, "agentType" | "recommendation" | "confidence" | "summary" | "status">>
+  specialist: AgentEvidence[]
 ): AgentAnalysisOutput {
   const completed = specialist.filter((s) => s.status === "COMPLETED" && s.recommendation);
   if (completed.length === 0) {
@@ -246,6 +273,12 @@ export function aggregatePortfolioManager(
     NEWS_ANALYST: 0.2,
     FUNDAMENTALS_ANALYST: 0.3,
     RISK_ANALYST: 0.24,
+    BULL_RESEARCHER: 0.12,
+    BEAR_RESEARCHER: 0.12,
+    TRADER_AGENT: 0.2,
+    AGGRESSIVE_RISK: 0.08,
+    NEUTRAL_RISK: 0.1,
+    CONSERVATIVE_RISK: 0.12,
     PORTFOLIO_MANAGER: 0
   };
 
@@ -272,9 +305,21 @@ export function aggregatePortfolioManager(
     reasons.push("Risk Analyst high-confidence AVOID capped the final score.");
   }
 
+  const conservativeRisk = completed.find((s) => s.agentType === "CONSERVATIVE_RISK");
+  if (conservativeRisk?.recommendation === "AVOID" && (conservativeRisk.confidence ?? 0) >= 0.65) {
+    score = Math.min(score, 48);
+    reasons.push("Conservative Risk critique limited the final approval score.");
+  }
+
+  const trader = completed.find((s) => s.agentType === "TRADER_AGENT");
+  if (trader?.recommendation === "HOLD" && score > 62) {
+    score -= 4;
+    reasons.push("Trader Agent preferred patience, so final score was moderated.");
+  }
+
   const recommendation = recommendationFromScore(score);
   const averageConfidence = completed.reduce((sum, s) => sum + (s.confidence ?? 0.5), 0) / completed.length;
-  const coverage = completed.length / 4;
+  const coverage = clamp(completed.length / 10, 0, 1);
   const confidence = clamp(0.35 + averageConfidence * 0.45 + coverage * 0.2, 0.45, 0.9);
   const conflict = new Set(completed.map((s) => s.recommendation)).size > 1;
 
@@ -282,7 +327,7 @@ export function aggregatePortfolioManager(
     score: round(score, 1),
     confidence: round(confidence, 2),
     recommendation,
-    summary: `Portfolio Manager recommends ${recommendation} with a ${Math.round(score)} composite score from ${completed.length}/4 specialists.`,
+    summary: `Portfolio Manager ${recommendation === "BUY" ? "approves" : recommendation === "AVOID" ? "rejects" : "holds"} ${recommendation} with a ${Math.round(score)} composite score from ${completed.length}/10 agent opinions.`,
     reasons: [
       ...reasons,
       conflict ? "Specialists disagreed, so confidence was moderated." : "Specialists were broadly aligned.",
@@ -490,6 +535,122 @@ function riskAnalysis(ticker: string, context: MarketContext): AgentAnalysisOutp
   return finishAgent(ticker, "Risk Analyst", "volatility, drawdown, valuation, and event-risk evidence", score, evidence, context.dataQuality.score, reasons);
 }
 
+function bullResearch(ticker: string, context: MarketContext, evidence: AgentEvidence[]): AgentAnalysisOutput {
+  const completed = completedEvidence(evidence);
+  const reasons: string[] = [];
+  let score = 50;
+  let evidenceCount = 0;
+
+  for (const item of completed.filter((agent) => agent.recommendation === "BUY")) {
+    const confidence = item.confidence ?? 0.5;
+    score += confidence * 8;
+    evidenceCount += 1;
+    reasons.push(`[${humanAgent(item.agentType as AnalysisAgentType)}] BUY case: ${firstReason(item)}`);
+  }
+
+  if (context.technicals?.trend === "UP") {
+    score += 8;
+    evidenceCount += 1;
+    reasons.push(`[${context.technicals.source}] Trend supports a bullish thesis.`);
+  }
+  if (isFiniteNumber(context.fundamentals.revenueGrowth) && context.fundamentals.revenueGrowth > 8) {
+    score += 7;
+    evidenceCount += 1;
+    reasons.push(`[${context.fundamentals.source}] Revenue growth gives the bull case operating support.`);
+  }
+  if (context.dataQuality.status === "LIVE" || context.dataQuality.status === "PARTIAL") {
+    score += 4;
+    reasons.push(`[${context.dataQuality.provider}] Evidence is usable enough to argue an upside case.`);
+  }
+
+  return finishAgent(ticker, "Bull Researcher", "the strongest upside evidence from specialists", score, evidenceCount, context.dataQuality.score, reasons);
+}
+
+function bearResearch(ticker: string, context: MarketContext, evidence: AgentEvidence[]): AgentAnalysisOutput {
+  const completed = completedEvidence(evidence);
+  const reasons: string[] = [];
+  let score = 50;
+  let evidenceCount = 0;
+
+  for (const item of completed.filter((agent) => agent.recommendation === "AVOID")) {
+    const confidence = item.confidence ?? 0.5;
+    score -= confidence * 9;
+    evidenceCount += 1;
+    reasons.push(`[${humanAgent(item.agentType as AnalysisAgentType)}] Bear concern: ${firstReason(item)}`);
+  }
+
+  if (context.dataQuality.status === "UNSUPPORTED" || context.dataQuality.status === "DEMO") {
+    score -= 14;
+    evidenceCount += 1;
+    reasons.push(`[data-quality] Missing live evidence weakens any confident trade.`);
+  }
+  if (isFiniteNumber(context.fundamentals.peRatio) && context.fundamentals.peRatio > 42) {
+    score -= 8;
+    evidenceCount += 1;
+    reasons.push(`[${context.fundamentals.source}] Valuation leaves less room for execution mistakes.`);
+  }
+  if (context.technicals?.trend === "DOWN") {
+    score -= 8;
+    evidenceCount += 1;
+    reasons.push(`[${context.technicals.source}] Trend gives the bear case timing support.`);
+  }
+
+  return finishAgent(ticker, "Bear Researcher", "the strongest downside and data-quality objections", score, evidenceCount, context.dataQuality.score, reasons);
+}
+
+function traderPlan(ticker: string, context: MarketContext, evidence: AgentEvidence[]): AgentAnalysisOutput {
+  const completed = completedEvidence(evidence);
+  const specialists = completed.filter((item) =>
+    ["TECHNICAL_ANALYST", "NEWS_ANALYST", "FUNDAMENTALS_ANALYST", "RISK_ANALYST", "BULL_RESEARCHER", "BEAR_RESEARCHER"].includes(item.agentType)
+  );
+  const score = scoreFromEvidence(specialists, 50);
+  const recommendation = recommendationFromScore(score);
+  const quote = context.quote.price;
+  const volatility = context.technicals?.volatility30d ?? 25;
+  const riskSize = volatility > 45 || context.dataQuality.score < 0.6 ? "small 2-4%" : volatility > 25 ? "moderate 4-6%" : "standard 6-8%";
+  const invalidation =
+    recommendation === "BUY"
+      ? `${formatMoneyLike(quote * 0.92)} or a break in the evidence trend`
+      : recommendation === "AVOID"
+        ? "wait for live evidence to improve or the bear thesis to clear"
+        : "wait for a stronger specialist majority";
+  const horizon = recommendation === "BUY" ? "2-6 weeks" : recommendation === "AVOID" ? "no entry until risk improves" : "watchlist only";
+  const reasons = [
+    `[plan] Action: ${recommendation}.`,
+    `[plan] Position size hint: ${riskSize} of simulated portfolio.`,
+    `[plan] Entry rationale: ${firstCompletedSummary(specialists)}`,
+    `[plan] Invalidation: ${invalidation}.`,
+    `[plan] Holding horizon: ${horizon}.`
+  ];
+
+  return {
+    score: round(clamp(score, 0, 100), 1),
+    confidence: round(clamp(0.42 + context.dataQuality.score * 0.24 + specialists.length * 0.035, 0.42, 0.88), 2),
+    recommendation,
+    summary: `Trader Agent proposes ${recommendation} for ${ticker.toUpperCase()} with ${riskSize} sizing and ${horizon} horizon.`,
+    reasons
+  };
+}
+
+function riskCouncil(ticker: string, context: MarketContext, evidence: AgentEvidence[], posture: "aggressive" | "neutral" | "conservative"): AgentAnalysisOutput {
+  const trader = completedEvidence(evidence).find((item) => item.agentType === "TRADER_AGENT");
+  const traderScore = scoreFromEvidence(trader ? [trader] : [], 50);
+  const riskPenalty = riskPenaltyFromContext(context);
+  const postureAdjustment = posture === "aggressive" ? 8 : posture === "conservative" ? -8 : 0;
+  const dataPenalty = context.dataQuality.score < 0.65 ? 8 : 0;
+  const score = traderScore + postureAdjustment - riskPenalty - dataPenalty;
+  const label = posture === "aggressive" ? "Aggressive Risk" : posture === "neutral" ? "Neutral Risk" : "Conservative Risk";
+  const reasons = [
+    `[trader] Trader plan was ${trader?.recommendation ?? "HOLD"} with ${Math.round((trader?.confidence ?? 0.5) * 100)}% confidence.`,
+    `[risk] Context risk penalty is ${round(riskPenalty, 1)} points from volatility, beta, drawdown, and data quality.`,
+    `[risk] ${label} posture adjustment is ${postureAdjustment >= 0 ? "+" : ""}${postureAdjustment} points.`
+  ];
+
+  if (context.dataQuality.score < 0.65) reasons.push("[data-quality] Weak evidence requires smaller sizing or no trade.");
+
+  return finishAgent(ticker, label, `${posture} critique of the trader plan`, score, 3, context.dataQuality.score, reasons);
+}
+
 function finishAgent(
   ticker: string,
   agentName: string,
@@ -555,6 +716,53 @@ function sentimentLabel(score: number) {
   if (score >= 0.15) return "positive";
   if (score <= -0.15) return "negative";
   return "neutral";
+}
+
+function completedEvidence(evidence: AgentEvidence[]) {
+  return evidence.filter((item) => item.status === "COMPLETED" && isRecommendation(item.recommendation));
+}
+
+function scoreFromEvidence(evidence: AgentEvidence[], fallback: number) {
+  const stanceScore: Record<Recommendation, number> = { BUY: 72, HOLD: 50, AVOID: 28 };
+  let total = 0;
+  let weight = 0;
+  for (const item of evidence) {
+    if (!isRecommendation(item.recommendation)) continue;
+    const confidence = clamp(item.confidence ?? 0.5, 0.2, 0.95);
+    total += stanceScore[item.recommendation] * confidence;
+    weight += confidence;
+  }
+  return weight > 0 ? total / weight : fallback;
+}
+
+function isRecommendation(value: unknown): value is Recommendation {
+  return value === "BUY" || value === "HOLD" || value === "AVOID";
+}
+
+function riskPenaltyFromContext(context: MarketContext) {
+  let penalty = 0;
+  const volatility = context.technicals?.volatility30d;
+  const maxDrawdown = context.technicals?.maxDrawdown;
+  if (isFiniteNumber(context.fundamentals.beta) && context.fundamentals.beta > 1.25) penalty += Math.min((context.fundamentals.beta - 1.25) * 10, 8);
+  if (isFiniteNumber(volatility) && volatility > 25) penalty += Math.min((volatility - 25) / 4, 10);
+  if (isFiniteNumber(maxDrawdown) && maxDrawdown > 20) penalty += Math.min((maxDrawdown - 20) / 5, 8);
+  if (context.dataQuality.status === "UNSUPPORTED") penalty += 10;
+  else if (context.dataQuality.status === "DEMO") penalty += 7;
+  else if (context.dataQuality.status === "PARTIAL") penalty += 3;
+  return penalty;
+}
+
+function firstReason(item: AgentEvidence) {
+  const reasons = Array.isArray(item.reasons) ? item.reasons : [];
+  return reasons.find((reason): reason is string => typeof reason === "string" && reason.length > 0) ?? item.summary ?? "specialist evidence was directionally supportive.";
+}
+
+function firstCompletedSummary(evidence: AgentEvidence[]) {
+  return evidence.find((item) => item.summary)?.summary ?? "specialist evidence did not produce a clear entry thesis.";
+}
+
+function formatMoneyLike(value: number) {
+  return `$${round(value, 2)}`;
 }
 
 function clamp(value: number, min: number, max: number) {

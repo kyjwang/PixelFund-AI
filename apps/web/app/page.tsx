@@ -14,12 +14,29 @@ import {
   watchlistItemSchema,
   wsQuoteStaleSchema
 } from "@pixelfund/schemas";
-import { PixelOffice } from "../components/PixelOffice";
+import { gameAgents, PixelOffice } from "../components/PixelOffice";
 import { api } from "../lib/api";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
 const stockSearchSchema = z.array(z.object({ symbol: z.string(), description: z.string() }));
-const agentOrder = ["TECHNICAL_ANALYST", "NEWS_ANALYST", "FUNDAMENTALS_ANALYST", "RISK_ANALYST", "PORTFOLIO_MANAGER"] as const;
+const meetingSteps = [
+  { agentId: "TECHNICAL_ANALYST", log: "Technical Analyst is checking price action..." },
+  { agentId: "FUNDAMENTALS_ANALYST", log: "Fundamentals Analyst is reviewing valuation..." },
+  { agentId: "NEWS_ANALYST", log: "News Analyst is scanning headlines..." },
+  { agentId: "RISK_ANALYST", log: "Risk Manager is checking downside risk..." },
+  { agentId: "MACRO_ANALYST", log: "Macro Analyst is checking rates and market regime..." },
+  { agentId: "SENTIMENT_ANALYST", log: "Sentiment Analyst is reading the crowd pulse..." },
+  { agentId: "QUANT_ANALYST", log: "Quant Analyst is ranking factor signals..." },
+  { agentId: "CRYPTO_SPECIALIST", log: "Crypto Specialist is checking liquidity spillover..." },
+  { agentId: "BULL_RESEARCHER", log: "Bull Researcher is building the strongest upside case..." },
+  { agentId: "BEAR_RESEARCHER", log: "Bear Researcher is challenging the setup..." },
+  { agentId: "TRADER_AGENT", log: "Trader Agent is converting debate into an execution plan..." },
+  { agentId: "AGGRESSIVE_RISK", log: "Aggressive Risk is checking if reward justifies volatility..." },
+  { agentId: "NEUTRAL_RISK", log: "Neutral Risk is balancing reward against uncertainty..." },
+  { agentId: "CONSERVATIVE_RISK", log: "Conservative Risk is protecting against drawdown..." },
+  { agentId: "PORTFOLIO_MANAGER", log: "Portfolio Manager is reviewing allocation impact..." },
+  { agentId: "TEAM_LEAD", log: "Team Lead is preparing final summary..." }
+];
 
 type Portfolio = z.infer<typeof portfolioSchema>;
 type AnalysisRun = z.infer<typeof analysisRunSchema>;
@@ -36,7 +53,12 @@ export default function HomePage() {
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<(typeof agentOrder)[number]>("TECHNICAL_ANALYST");
+  const [selectedAgent, setSelectedAgent] = useState<string>("TECHNICAL_ANALYST");
+  const [agentUiStatuses, setAgentUiStatuses] = useState<Record<string, string>>({});
+  const [agentMockAnalysis, setAgentMockAnalysis] = useState<Record<string, string>>({});
+  const [meetingLog, setMeetingLog] = useState<string[]>([]);
+  const [isMeetingRunning, setIsMeetingRunning] = useState(false);
+  const [pinnedInsights, setPinnedInsights] = useState<string[]>([]);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -197,20 +219,50 @@ export default function HomePage() {
     [latest, selectedAgent]
   );
 
+  const selectedGameAgent = useMemo(
+    () => gameAgents.find((agent) => agent.id === selectedAgent) ?? gameAgents[0],
+    [selectedAgent]
+  );
+
   const portfolioManager = useMemo(
     () => latest?.recommendations?.find((r) => r.agentType === "PORTFOLIO_MANAGER"),
+    [latest]
+  );
+
+  const bullResearcher = useMemo(
+    () => latest?.recommendations?.find((r) => r.agentType === "BULL_RESEARCHER"),
+    [latest]
+  );
+
+  const bearResearcher = useMemo(
+    () => latest?.recommendations?.find((r) => r.agentType === "BEAR_RESEARCHER"),
+    [latest]
+  );
+
+  const traderAgent = useMemo(
+    () => latest?.recommendations?.find((r) => r.agentType === "TRADER_AGENT"),
+    [latest]
+  );
+
+  const riskCouncil = useMemo(
+    () =>
+      ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"].map((agentType) =>
+        latest?.recommendations?.find((r) => r.agentType === agentType)
+      ),
     [latest]
   );
 
   const agentStatuses = useMemo(() => {
     const map: Record<string, string | undefined> = {};
     for (const rec of latest?.recommendations ?? []) map[rec.agentType] = rec.status;
+    for (const [agentId, status] of Object.entries(agentUiStatuses)) map[agentId] = status;
     return map;
-  }, [latest]);
+  }, [latest, agentUiStatuses]);
 
   const agentRecommendations = useMemo(() => {
     const map: Record<string, string | undefined> = {};
     for (const rec of latest?.recommendations ?? []) map[rec.agentType] = rec.recommendation ?? undefined;
+    for (const agent of gameAgents) if (!map[agent.id]) map[agent.id] = agent.signal.includes("Risk") ? "HOLD" : undefined;
     return map;
   }, [latest]);
 
@@ -294,6 +346,53 @@ export default function HomePage() {
     }
   }
 
+  function askSelectedAgent() {
+    const agent = selectedGameAgent;
+    setAgentUiStatuses((statuses) => ({ ...statuses, [agent.id]: "THINKING" }));
+    window.setTimeout(() => {
+      const marketTone = quoteChangePositive ? "price action is constructive" : "price action is under pressure";
+      const qualityTone = dataQualityStatus === "LIVE" ? "live evidence" : `${dataQualityStatus.toLowerCase()} evidence`;
+      setAgentMockAnalysis((analysis) => ({
+        ...analysis,
+        [agent.id]: `${agent.name}: ${agent.mockAnalysis} For ${ticker.toUpperCase()}, ${marketTone}, and I am weighting this against ${qualityTone}.`
+      }));
+      setAgentUiStatuses((statuses) => ({ ...statuses, [agent.id]: "COMPLETED" }));
+    }, 900);
+  }
+
+  function pinSelectedInsight() {
+    const agent = selectedGameAgent;
+    const insight = agentMockAnalysis[agent.id] ?? selected?.summary ?? agent.mockAnalysis;
+    setPinnedInsights((items) => [`${agent.role}: ${insight}`, ...items].slice(0, 5));
+  }
+
+  function startTeamMeeting() {
+    if (isMeetingRunning) return;
+    setIsMeetingRunning(true);
+    setMeetingLog([]);
+    setAgentUiStatuses((statuses) => {
+      const next = { ...statuses };
+      for (const step of meetingSteps) next[step.agentId] = "IDLE";
+      return next;
+    });
+
+    meetingSteps.forEach((step, idx) => {
+      window.setTimeout(() => {
+        setSelectedAgent(step.agentId);
+        setAgentUiStatuses((statuses) => ({ ...statuses, [step.agentId]: "THINKING" }));
+        setMeetingLog((items) => [...items, step.log]);
+      }, idx * 650);
+
+      window.setTimeout(() => {
+        setAgentUiStatuses((statuses) => ({ ...statuses, [step.agentId]: "COMPLETED" }));
+        if (idx === meetingSteps.length - 1) {
+          setMeetingLog((items) => [...items, "Team Lead: final desk summary is ready for review."]);
+          setIsMeetingRunning(false);
+        }
+      }, idx * 650 + 480);
+    });
+  }
+
   async function addWatchlist() {
     const item = await api("/watchlist", watchlistItemSchema, {
       method: "POST",
@@ -319,8 +418,8 @@ export default function HomePage() {
       }
 
       const idx = Number(event.key);
-      if (idx >= 1 && idx <= agentOrder.length) {
-        setSelectedAgent(agentOrder[idx - 1]);
+      if (idx >= 1 && idx <= Math.min(gameAgents.length, 9)) {
+        setSelectedAgent(gameAgents[idx - 1].id);
       }
     };
 
@@ -332,6 +431,14 @@ export default function HomePage() {
   const finalRec = latest?.finalRec ?? portfolioManager?.recommendation ?? "PENDING";
   const dataQuality = marketContext?.dataQuality.score ?? 0;
   const dataQualityStatus = marketContext?.dataQuality.status ?? "DEMO";
+  const accountValue = portfolio?.totalValue ?? 0;
+  const pnlPercent = portfolio && portfolio.totalValue > 0 ? (portfolio.totalPnl / Math.max(1, portfolio.totalValue - portfolio.totalPnl)) * 100 : 0;
+  const hitRate = backtest ? Math.round(backtest.winRate * 100) : 70;
+  const terminalStatus = agentStatuses[selectedGameAgent.id] ?? selected?.status ?? "IDLE";
+  const terminalSignal = selected?.recommendation ?? selectedGameAgent.signal;
+  const terminalConfidence =
+    typeof selected?.confidence === "number" ? Math.round(selected.confidence * 100) : selectedGameAgent.confidence;
+  const terminalAnalysis = agentMockAnalysis[selectedGameAgent.id] ?? selected?.summary ?? selectedGameAgent.mockAnalysis;
 
   return (
     <main className="min-h-screen bg-[#edf6f9] text-slate-950" aria-label="pixelFund AI trading simulation">
@@ -339,13 +446,20 @@ export default function HomePage() {
         <header className="grid gap-3 rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card lg:grid-cols-[1.2fr_0.8fr]">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-pixel text-base md:text-xl">pixelFund AI</h1>
+              <h1 className="font-pixel text-base md:text-xl">PixelTrade AI</h1>
               <span className={badgeClass(finalRec)} aria-label={`Final recommendation ${finalRec}`}>
                 Final Rec: {finalRec}
               </span>
               <span className={`border-2 border-slate-950 px-2 py-1 text-xs font-semibold ${socketConnected ? "bg-emerald-200" : "bg-red-200"}`}>
                 {socketConnected ? "Live socket" : "Reconnecting"}
               </span>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-5">
+              <HudChip label="Cash" value={formatMoney(portfolio?.cash ?? 10000)} />
+              <HudChip label="Portfolio" value={formatMoney(accountValue || 12430)} />
+              <HudChip label="P/L" value={formatSignedPercent(pnlPercent || 4.2)} tone={(pnlPercent || 4.2) >= 0 ? "good" : "bad"} />
+              <HudChip label="Hit Rate" value={`${hitRate}%`} />
+              <HudChip label="Desk" value={selectedGameAgent.label} />
             </div>
             <p className="mt-2 max-w-3xl text-xs text-slate-700 sm:text-sm">{APP_DISCLAIMER}</p>
           </div>
@@ -393,7 +507,7 @@ export default function HomePage() {
 
         <section className="grid gap-4 lg:grid-cols-[1.45fr_0.85fr]" aria-label="Trading desk">
            <PixelOffice
-             onSelect={(agentId) => setSelectedAgent(agentId as (typeof agentOrder)[number])}
+             onSelect={(agentId) => setSelectedAgent(agentId)}
              selectedAgent={selectedAgent}
              agentStatuses={agentStatuses}
              agentRecommendations={agentRecommendations}
@@ -479,16 +593,34 @@ export default function HomePage() {
         <section className="grid gap-4 lg:grid-cols-[1fr_1fr]" aria-label="Agent and portfolio panels">
           <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-pixel text-[10px] sm:text-xs">Agent Output</h2>
-              <span className={badgeClass(selected?.recommendation ?? "PENDING")}>{selected?.recommendation ?? "PENDING"}</span>
+              <h2 className="font-pixel text-[10px] sm:text-xs">Agent Terminal</h2>
+              <span className={badgeClass(String(terminalSignal))}>{terminalSignal}</span>
             </div>
-            <p className="mt-2 text-xs font-semibold">{agentLabel(selectedAgent)} | Status: {selected?.status ?? "IDLE"}</p>
-            <p className="mt-2 min-h-12 text-sm leading-6">{selected?.summary ?? "Run analysis, then click an agent in the office to inspect its report."}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              <Metric label="Confidence" value={typeof selected?.confidence === "number" ? `${Math.round(selected.confidence * 100)}%` : "-"} />
-              <Metric label="Run" value={latest?.status ?? "NONE"} />
-              <Metric label="Ticker" value={latest?.ticker ?? ticker.toUpperCase()} />
-              <Metric label="Updated" value={selected?.updatedAt ? new Date(selected.updatedAt).toLocaleTimeString() : "--:--"} />
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <Metric label="Agent" value={selectedGameAgent.name} />
+              <Metric label="Role" value={selectedGameAgent.role} />
+              <Metric label="Personality" value={selectedGameAgent.personality} />
+              <Metric label="Current Status" value={terminalStatus} tone={terminalStatus === "FAILED" ? "bad" : terminalStatus === "COMPLETED" ? "good" : undefined} />
+              <Metric label="Current Signal" value={String(terminalSignal)} />
+              <Metric label="Confidence" value={`${terminalConfidence}%`} />
+            </div>
+            <p className="mt-3 min-h-20 border-2 border-black bg-[#0f172a] p-3 font-mono text-xs leading-6 text-[#bbf7d0]">
+              {terminalAnalysis}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                className="h-10 border-2 border-black bg-[#0c7c59] px-3 text-xs font-semibold text-white disabled:bg-slate-500"
+                onClick={askSelectedAgent}
+                disabled={terminalStatus === "THINKING"}
+              >
+                Ask this agent
+              </button>
+              <button
+                className="h-10 border-2 border-black bg-[#2f4858] px-3 text-xs font-semibold text-white"
+                onClick={pinSelectedInsight}
+              >
+                Pin insight
+              </button>
             </div>
             <div className="mt-3 grid gap-2">
               {(selected?.reasons ?? []).map((reason, idx) => (
@@ -528,6 +660,74 @@ export default function HomePage() {
               {(portfolio?.positions.length ?? 0) === 0 ? <p className="p-2 text-xs text-slate-600">No simulated positions yet.</p> : null}
             </div>
           </section>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[1fr_0.8fr]" aria-label="Team meeting and pinned insights">
+          <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-pixel text-[10px] sm:text-xs">Team Meeting</h2>
+              <button
+                className="h-10 border-2 border-black bg-[#7c3aed] px-3 text-xs font-semibold text-white disabled:bg-slate-500"
+                onClick={startTeamMeeting}
+                disabled={isMeetingRunning}
+              >
+                {isMeetingRunning ? "Meeting running" : "Start Team Meeting"}
+              </button>
+            </div>
+            <div className="mt-3 max-h-56 overflow-auto border-2 border-black bg-[#0f172a] p-2 font-mono text-xs text-[#bbf7d0]">
+              {meetingLog.length === 0 ? (
+                <p>Waiting for the desk captain to call the room...</p>
+              ) : (
+                meetingLog.map((item, idx) => (
+                  <p key={`${item}-${idx}`} className="border-b border-[#14532d] py-1 last:border-b-0">
+                    {idx + 1}. {item}
+                  </p>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
+            <h2 className="font-pixel text-[10px] sm:text-xs">Pinned Insights</h2>
+            <div className="mt-3 grid gap-2">
+              {pinnedInsights.length === 0 ? (
+                <p className="border-2 border-black bg-[#f7fff7] p-2 text-xs text-slate-700">Pinned agent insights will appear here.</p>
+              ) : (
+                pinnedInsights.map((item, idx) => (
+                  <p key={`${item}-${idx}`} className="border-2 border-black bg-[#f7fff7] p-2 text-xs leading-5">
+                    {item}
+                  </p>
+                ))
+              )}
+            </div>
+          </section>
+        </section>
+
+        <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4" aria-label="Debate Floor">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-pixel text-[10px] sm:text-xs">Debate Floor</h2>
+            <span className="border-2 border-black bg-[#edf6f9] px-2 py-1 text-xs font-semibold">
+              Bull vs Bear | Trader Plan | Risk Council
+            </span>
+          </div>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <DebateCard title="Bull Researcher" result={bullResearcher} tone="good" onSelect={() => setSelectedAgent("BULL_RESEARCHER")} />
+            <DebateCard title="Bear Researcher" result={bearResearcher} tone="bad" onSelect={() => setSelectedAgent("BEAR_RESEARCHER")} />
+          </div>
+          <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_1.4fr]">
+            <DebateCard title="Trader Plan" result={traderAgent} tone="neutral" onSelect={() => setSelectedAgent("TRADER_AGENT")} />
+            <div className="grid gap-3 md:grid-cols-3">
+              {riskCouncil.map((risk, idx) => (
+                <DebateCard
+                  key={risk?.agentType ?? idx}
+                  title={risk ? agentLabel(risk.agentType) : ["Aggressive Risk", "Neutral Risk", "Conservative Risk"][idx]}
+                  result={risk}
+                  tone={idx === 0 ? "good" : idx === 2 ? "bad" : "neutral"}
+                  onSelect={() => setSelectedAgent(risk?.agentType ?? ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"][idx])}
+                />
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr_1fr]">
@@ -657,6 +857,50 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: "
       <p className="text-[10px] uppercase text-slate-500">{label}</p>
       <p className={`mt-1 truncate text-xs font-semibold ${toneClass}`}>{value}</p>
     </div>
+  );
+}
+
+function HudChip({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
+  const toneClass = tone === "good" ? "text-emerald-950" : tone === "bad" ? "text-red-950" : "text-slate-950";
+  const bgClass = tone === "good" ? "bg-emerald-200" : tone === "bad" ? "bg-red-200" : "bg-[#f7fff7]";
+  return (
+    <div className={`border-2 border-black px-2 py-1 ${bgClass}`}>
+      <p className="text-[9px] uppercase text-slate-600">{label}</p>
+      <p className={`truncate font-pixel text-[10px] ${toneClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function DebateCard({
+  title,
+  result,
+  tone,
+  onSelect
+}: {
+  title: string;
+  result?: AnalysisRun["recommendations"][number];
+  tone: "good" | "bad" | "neutral";
+  onSelect: () => void;
+}) {
+  const toneClass =
+    tone === "good" ? "bg-emerald-100" : tone === "bad" ? "bg-red-100" : "bg-[#edf6f9]";
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`min-h-40 border-2 border-black p-3 text-left shadow-[3px_3px_0_#111] motion-safe:transition-transform motion-safe:active:scale-[0.99] ${toneClass}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-bold uppercase">{title}</p>
+        <span className={badgeClass(result?.recommendation ?? result?.status ?? "PENDING")}>{result?.recommendation ?? result?.status ?? "PENDING"}</span>
+      </div>
+      <p className="mt-2 min-h-10 text-xs leading-5">{result?.summary ?? "Waiting for this agent to report."}</p>
+      <div className="mt-2 grid gap-1">
+        {(result?.reasons ?? []).slice(0, 2).map((reason, idx) => (
+          <EvidenceReason key={`${result?.id ?? title}-${idx}`} reason={reason} />
+        ))}
+      </div>
+    </button>
   );
 }
 

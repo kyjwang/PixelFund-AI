@@ -73,6 +73,19 @@ describe("recommendation aggregation", () => {
     expect(manager.recommendation).toBe("HOLD");
     expect(manager.reasons.some((reason) => reason.includes("capped"))).toBe(true);
   });
+
+  test("debate and risk council can moderate a bullish trader plan", () => {
+    const manager = aggregatePortfolioManager([
+      { agentType: "TECHNICAL_ANALYST", status: "COMPLETED", recommendation: "BUY", confidence: 0.8, summary: "trend" },
+      { agentType: "FUNDAMENTALS_ANALYST", status: "COMPLETED", recommendation: "BUY", confidence: 0.8, summary: "fundamentals" },
+      { agentType: "BULL_RESEARCHER", status: "COMPLETED", recommendation: "BUY", confidence: 0.76, summary: "bull" },
+      { agentType: "TRADER_AGENT", status: "COMPLETED", recommendation: "BUY", confidence: 0.74, summary: "trade plan" },
+      { agentType: "CONSERVATIVE_RISK", status: "COMPLETED", recommendation: "AVOID", confidence: 0.72, summary: "risk limit" }
+    ]);
+
+    expect(manager.score).toBeLessThan(62);
+    expect(manager.reasons.some((reason) => reason.includes("Conservative Risk"))).toBe(true);
+  });
 });
 
 describe("agent analysis engine", () => {
@@ -89,6 +102,65 @@ describe("agent analysis engine", () => {
     const output = buildAgentAnalysis("FUNDAMENTALS_ANALYST", "AAPL", context);
     expect(output.recommendation).toBe("BUY");
     expect(output.confidence).toBeGreaterThan(0.6);
+  });
+
+  test("bull and bear researchers use specialist evidence", () => {
+    const context = makeContext({});
+    const evidence = [
+      {
+        agentType: "FUNDAMENTALS_ANALYST",
+        status: "COMPLETED",
+        recommendation: "BUY",
+        confidence: 0.8,
+        summary: "growth",
+        reasons: ["[finnhub] Revenue growth supports upside."]
+      },
+      {
+        agentType: "RISK_ANALYST",
+        status: "COMPLETED",
+        recommendation: "AVOID",
+        confidence: 0.7,
+        summary: "risk",
+        reasons: ["[finnhub] Beta is elevated."]
+      }
+    ] as const;
+
+    const bull = buildAgentAnalysis("BULL_RESEARCHER", "AAPL", context, [...evidence]);
+    const bear = buildAgentAnalysis("BEAR_RESEARCHER", "AAPL", context, [...evidence]);
+    expect(bull.reasons.some((reason) => reason.includes("BUY case"))).toBe(true);
+    expect(bear.reasons.some((reason) => reason.includes("Bear concern"))).toBe(true);
+  });
+
+  test("trader plan includes action, sizing, invalidation, and horizon", () => {
+    const context = makeContext({});
+    const trader = buildAgentAnalysis("TRADER_AGENT", "AAPL", context, [
+      { agentType: "BULL_RESEARCHER", status: "COMPLETED", recommendation: "BUY", confidence: 0.8, summary: "bull case" },
+      { agentType: "BEAR_RESEARCHER", status: "COMPLETED", recommendation: "HOLD", confidence: 0.45, summary: "bear case" }
+    ]);
+
+    expect(trader.reasons.some((reason) => reason.includes("Position size hint"))).toBe(true);
+    expect(trader.reasons.some((reason) => reason.includes("Invalidation"))).toBe(true);
+    expect(trader.reasons.some((reason) => reason.includes("Holding horizon"))).toBe(true);
+  });
+
+  test("unsupported data lowers risk council confidence", () => {
+    const context = makeContext({});
+    context.dataQuality = {
+      ...context.dataQuality,
+      score: 0.45,
+      status: "UNSUPPORTED",
+      provider: "unsupported",
+      liveQuote: false,
+      fundamentals: false,
+      warnings: ["Live quote unavailable."],
+      messages: ["Unsupported market data."]
+    };
+
+    const conservative = buildAgentAnalysis("CONSERVATIVE_RISK", "SIVE.ST", context, [
+      { agentType: "TRADER_AGENT", status: "COMPLETED", recommendation: "BUY", confidence: 0.75, summary: "trade plan" }
+    ]);
+    expect(conservative.recommendation).not.toBe("BUY");
+    expect(conservative.reasons.some((reason) => reason.includes("Weak evidence"))).toBe(true);
   });
 
   test("technical indicators detect an uptrend", () => {
