@@ -263,6 +263,49 @@ export const agentResultSchema = z.object({
   updatedAt: z.coerce.string().optional()
 });
 
+export const agentExplanationStageSchema = z.enum(["SPECIALIST", "DEBATE", "TRADER", "RISK_COUNCIL", "SYNTHESIS"]);
+
+export const agentExplanationItemSchema = z.object({
+  agentType: agentTypeSchema,
+  label: z.string(),
+  role: z.string(),
+  stage: agentExplanationStageSchema,
+  description: z.string(),
+  status: agentStatusSchema.or(z.literal("IDLE")),
+  recommendation: recommendationSchema.nullable(),
+  confidence: z.number().min(0).max(1).nullable(),
+  baseWeight: z.number().nonnegative(),
+  effectiveWeight: z.number().nonnegative(),
+  contribution: z.number().nonnegative(),
+  summary: z.string().nullable(),
+  reasons: z.array(z.string()),
+  errorReason: z.string().nullable()
+});
+
+export const analysisExplanationSchema = z.object({
+  analysisRunId: z.string(),
+  ticker: tickerSchema,
+  status: agentStatusSchema,
+  finalRec: recommendationSchema.nullable(),
+  finalSummary: z.string().nullable(),
+  managerScore: z.number(),
+  managerConfidence: z.number().min(0).max(1),
+  voteMix: z.object({
+    BUY: z.number().int().nonnegative(),
+    HOLD: z.number().int().nonnegative(),
+    AVOID: z.number().int().nonnegative()
+  }),
+  coverage: z.object({
+    completed: z.number().int().nonnegative(),
+    total: z.number().int().positive(),
+    failed: z.number().int().nonnegative(),
+    pending: z.number().int().nonnegative()
+  }),
+  topContributors: z.array(agentTypeSchema),
+  caveats: z.array(z.string()),
+  agents: z.array(agentExplanationItemSchema)
+});
+
 export const analysisRunSchema = z.object({
   id: z.string(),
   ticker: tickerSchema,
@@ -334,3 +377,4 @@ export type TradeCreateInput = z.infer<typeof tradeCreateSchema>;
 export type TradePreview = z.infer<typeof tradePreviewSchema>;
 export type AnalysisRun = z.infer<typeof analysisRunSchema>;
 export type AgentResult = z.infer<typeof agentResultSchema>;
+export type AnalysisExplanation = z.infer<typeof analysisExplanationSchema>;

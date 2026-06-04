@@ -1,25 +1,10 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { AgentStatus } from "@prisma/client";
 import { Queue } from "bullmq";
-import { aggregatePortfolioManager } from "@pixelfund/domain";
+import { ANALYSIS_PIPELINE, aggregatePortfolioManager, buildAnalysisExplanation } from "@pixelfund/domain";
 import { PrismaService } from "../common/prisma.service";
 import { EventsGateway } from "../ws/events.gateway";
-
-const specialists = [
-  "TECHNICAL_ANALYST",
-  "NEWS_ANALYST",
-  "FUNDAMENTALS_ANALYST",
-  "RISK_ANALYST",
-  "MACRO_ANALYST",
-  "SENTIMENT_ANALYST",
-  "QUANT_ANALYST",
-  "CRYPTO_SPECIALIST"
-] as const;
-
-const debateAgents = ["BULL_RESEARCHER", "BEAR_RESEARCHER"] as const;
-const riskCouncil = ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"] as const;
-const pipelineAgents = [...specialists, ...debateAgents, "TRADER_AGENT", ...riskCouncil, "TEAM_LEAD"] as const;
 
 @Injectable()
 export class AnalysisService {
@@ -54,7 +39,7 @@ export class AnalysisService {
         status: "PENDING",
         recommendations: {
           create: [
-            ...pipelineAgents.map((agentType) => ({ agentType, status: "PENDING" as AgentStatus })),
+            ...ANALYSIS_PIPELINE.map((agentType) => ({ agentType, status: "PENDING" as AgentStatus })),
             { agentType: "PORTFOLIO_MANAGER", status: "PENDING" as AgentStatus }
           ]
         }
@@ -129,5 +114,14 @@ export class AnalysisService {
       include: { recommendations: true },
       take: 20
     });
+  }
+
+  async explainRun(id: string) {
+    const run = await this.prisma.analysisRun.findUnique({
+      where: { id },
+      include: { recommendations: true }
+    });
+    if (!run) throw new NotFoundException("Analysis run not found");
+    return buildAnalysisExplanation(run);
   }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post } from "@nestjs/common";
 import { analysisRunCreateSchema } from "@pixelfund/schemas";
 import { AnalysisService } from "./analysis.service";
 
@@ -15,5 +15,10 @@ export class AnalysisController {
   @Get()
   list() {
     return this.service.listRuns();
+  }
+
+  @Get(":id/explain")
+  explain(@Param("id") id: string) {
+    return this.service.explainRun(id);
   }
 }

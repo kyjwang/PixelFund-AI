@@ -7,12 +7,117 @@
 }
 
 body {
-  @apply bg-[#edf6f9] text-slate-900;
+  @apply bg-[#c7e9e4] text-slate-900;
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    radial-gradient(circle at 18% 12%, #f4d06f 0 12%, transparent 12%),
+    linear-gradient(180deg, #b8f3ff 0%, #edf6f9 42%, #d9f0e8 100%);
+  background-size: 18px 18px, 18px 18px, auto, auto;
 }
 
 .pixel-card {
   image-rendering: pixelated;
   box-shadow: 0 0 0 2px #111, 6px 6px 0 #111;
+}
+
+.pixel-panel,
+.pixel-button,
+.hud-chip {
+  image-rendering: pixelated;
+}
+
+.pixel-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.42), transparent 32%),
+    linear-gradient(180deg, rgba(255,255,255,0.36), transparent 44%);
+}
+
+.pixel-button {
+  image-rendering: pixelated;
+}
+
+.pixel-glow {
+  animation: pixel-glow 1.7s ease-in-out infinite;
+}
+
+.achievement-toast {
+  animation: achievement-pop 3.2s ease both;
+}
+
+.pixel-portrait {
+  position: relative;
+}
+
+.pixel-portrait span,
+.pixel-portrait::before,
+.pixel-portrait::after {
+  position: absolute;
+  content: "";
+  border: 2px solid #111;
+}
+
+.pixel-portrait span {
+  left: 28px;
+  top: 18px;
+  width: 38px;
+  height: 42px;
+  background: #f0b98d;
+  box-shadow: 0 -12px 0 #1e293b, 0 42px 0 10px #7c3aed;
+}
+
+.pixel-portrait::before {
+  left: 36px;
+  top: 32px;
+  width: 6px;
+  height: 6px;
+  background: #111;
+  box-shadow: 18px 0 0 #111;
+}
+
+.pixel-portrait::after {
+  left: 42px;
+  top: 48px;
+  width: 22px;
+  height: 4px;
+  background: #7f1d1d;
+}
+
+@keyframes pixel-glow {
+  0%, 100% {
+    box-shadow: 4px 4px 0 #111, 0 0 0 0 rgba(124, 58, 237, 0.45);
+  }
+  50% {
+    box-shadow: 5px 5px 0 #111, 0 0 0 6px rgba(124, 58, 237, 0.18), 0 0 22px rgba(124, 58, 237, 0.52);
+  }
+}
+
+@keyframes achievement-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.95);
+  }
+  12%, 82% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
+@keyframes pixel-idle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
 }
 
 :focus-visible {

@@ -4,6 +4,7 @@ import {
   aggregateRecommendation,
   applyTrade,
   buildAgentAnalysis,
+  buildAnalysisExplanation,
   computeTechnicalIndicators,
   runPortfolioManagerBacktest
 } from "../src/index";
@@ -85,6 +86,28 @@ describe("recommendation aggregation", () => {
 
     expect(manager.score).toBeLessThan(62);
     expect(manager.reasons.some((reason) => reason.includes("Conservative Risk"))).toBe(true);
+  });
+
+  test("analysis explanation exposes coverage, votes, and top contributors", () => {
+    const explanation = buildAnalysisExplanation({
+      id: "run-1",
+      ticker: "AAPL",
+      status: "COMPLETED",
+      finalRec: "HOLD",
+      finalSummary: "Mixed committee",
+      recommendations: [
+        { agentType: "TECHNICAL_ANALYST", status: "COMPLETED", recommendation: "BUY", confidence: 0.8, summary: "trend", reasons: ["trend"] },
+        { agentType: "FUNDAMENTALS_ANALYST", status: "COMPLETED", recommendation: "BUY", confidence: 0.7, summary: "growth", reasons: ["growth"] },
+        { agentType: "CONSERVATIVE_RISK", status: "COMPLETED", recommendation: "AVOID", confidence: 0.75, summary: "risk", reasons: ["risk"] },
+        { agentType: "PORTFOLIO_MANAGER", status: "COMPLETED", recommendation: "HOLD", confidence: 0.66, summary: "hold", reasons: ["mixed"] }
+      ]
+    });
+
+    expect(explanation.voteMix.BUY).toBe(2);
+    expect(explanation.voteMix.AVOID).toBe(1);
+    expect(explanation.coverage.completed).toBe(3);
+    expect(explanation.topContributors).toContain("TECHNICAL_ANALYST");
+    expect(explanation.caveats.some((caveat) => caveat.includes("conflict"))).toBe(true);
   });
 });
 

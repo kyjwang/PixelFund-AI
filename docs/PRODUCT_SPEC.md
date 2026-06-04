@@ -30,7 +30,7 @@
 4. Trade preview with order type, trigger status, projected cash/shares, warnings, and sizing hint.
 5. Virtual buy/sell trade execution with immediate portfolio update when the order is executable.
 6. Recommendation and portfolio state persistence.
-7. Manager explainability with committee vote mix, confidence, reasons, and data-quality caveats.
+7. Manager explainability with backend-computed committee vote mix, coverage, confidence, weights, contributions, top contributors, reasons, and data-quality caveats.
 
 ## Constraints
 - Educational simulation only; not financial advice.
@@ -44,3 +44,4 @@
   - `INSUFFICIENT_SHARES`
   - `ORDER_NOT_TRIGGERED`
 - Recommendation aggregation must tolerate missing/failed specialist outputs and still produce deterministic fallback.
+- UI agent roster must derive agent order, labels, stages, and weights from the shared domain profile source.

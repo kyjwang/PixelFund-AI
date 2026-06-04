@@ -83,6 +83,12 @@
 - Purpose: list recent runs
 - Response: `{ data: AnalysisRun[] }`
 
+### `GET /analysis-runs/:id/explain`
+- Purpose: structured manager explainability for a run
+- Response: `{ data: AnalysisExplanation }`
+- Explanation fields: `managerScore`, `managerConfidence`, `voteMix`, `coverage`, `topContributors`, `caveats[]`, `agents[]`
+- Agent explanation fields: `agentType`, `role`, `stage`, `status`, `recommendation`, `confidence`, `baseWeight`, `effectiveWeight`, `contribution`, `summary`, `reasons[]`
+
 ## Request Correlation
 - Response header includes `x-request-id`.
 - Error envelope includes `requestId`.

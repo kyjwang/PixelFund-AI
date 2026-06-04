@@ -34,6 +34,40 @@ export type AgentAnalysisOutput = {
   score: number;
 };
 
+export type AgentProfile = {
+  id: AnalysisAgentType;
+  label: string;
+  role: string;
+  stage: "SPECIALIST" | "DEBATE" | "TRADER" | "RISK_COUNCIL" | "SYNTHESIS";
+  defaultWeight: number;
+  description: string;
+};
+
+export const AGENT_PROFILES: AgentProfile[] = [
+  { id: "TECHNICAL_ANALYST", label: "TA", role: "Technical Analyst", stage: "SPECIALIST", defaultWeight: 0.26, description: "Reads price action, trend, range, and volume evidence." },
+  { id: "NEWS_ANALYST", label: "NA", role: "News Analyst", stage: "SPECIALIST", defaultWeight: 0.2, description: "Evaluates headline sentiment and analyst trend evidence." },
+  { id: "FUNDAMENTALS_ANALYST", label: "FA", role: "Fundamentals Analyst", stage: "SPECIALIST", defaultWeight: 0.3, description: "Checks valuation, growth, profitability, and balance sheet quality." },
+  { id: "RISK_ANALYST", label: "RM", role: "Risk Analyst", stage: "SPECIALIST", defaultWeight: 0.24, description: "Caps downside using volatility, drawdown, beta, valuation, and event risk." },
+  { id: "MACRO_ANALYST", label: "MA", role: "Macro Analyst", stage: "SPECIALIST", defaultWeight: 0.12, description: "Frames beta, volatility, and growth resilience against market regime." },
+  { id: "SENTIMENT_ANALYST", label: "SA", role: "Sentiment Analyst", stage: "SPECIALIST", defaultWeight: 0.1, description: "Measures crowd tone, analyst consensus, and price reaction." },
+  { id: "QUANT_ANALYST", label: "QA", role: "Quant Analyst", stage: "SPECIALIST", defaultWeight: 0.16, description: "Ranks trend, volume, valuation, and drawdown factors." },
+  { id: "CRYPTO_SPECIALIST", label: "CS", role: "Crypto Specialist", stage: "SPECIALIST", defaultWeight: 0.06, description: "Checks crypto-beta and cross-asset liquidity sensitivity." },
+  { id: "BULL_RESEARCHER", label: "BU", role: "Bull Researcher", stage: "DEBATE", defaultWeight: 0.12, description: "Builds the strongest upside case from completed evidence." },
+  { id: "BEAR_RESEARCHER", label: "BE", role: "Bear Researcher", stage: "DEBATE", defaultWeight: 0.12, description: "Challenges the thesis with downside and data-quality objections." },
+  { id: "TRADER_AGENT", label: "TR", role: "Trader Agent", stage: "TRADER", defaultWeight: 0.2, description: "Converts the committee view into action, sizing, invalidation, and horizon." },
+  { id: "AGGRESSIVE_RISK", label: "AR", role: "Aggressive Risk", stage: "RISK_COUNCIL", defaultWeight: 0.08, description: "Tests whether upside justifies volatility." },
+  { id: "NEUTRAL_RISK", label: "NR", role: "Neutral Risk", stage: "RISK_COUNCIL", defaultWeight: 0.1, description: "Balances expected reward against uncertainty." },
+  { id: "CONSERVATIVE_RISK", label: "CR", role: "Conservative Risk", stage: "RISK_COUNCIL", defaultWeight: 0.12, description: "Protects against drawdown and weak evidence." },
+  { id: "TEAM_LEAD", label: "TL", role: "Team Lead", stage: "SYNTHESIS", defaultWeight: 0, description: "Summarizes the room before final portfolio approval." },
+  { id: "PORTFOLIO_MANAGER", label: "PM", role: "Portfolio Manager", stage: "SYNTHESIS", defaultWeight: 0, description: "Aggregates committee evidence into the final recommendation." }
+];
+
+export const ANALYSIS_PIPELINE = AGENT_PROFILES.filter((agent) => agent.id !== "PORTFOLIO_MANAGER").map((agent) => agent.id);
+
+export const MANAGER_WEIGHTS = Object.fromEntries(
+  AGENT_PROFILES.map((agent) => [agent.id, agent.defaultWeight])
+) as Record<AnalysisAgentType, number>;
+
 type AgentEvidence = {
   agentType: string;
   recommendation?: Recommendation | string | null;
@@ -41,6 +75,7 @@ type AgentEvidence = {
   summary?: string | null;
   status: string;
   reasons?: unknown;
+  errorReason?: string | null;
 };
 
 export function computeTechnicalIndicators(candles: HistoricalCandle[]): TechnicalIndicators {
@@ -283,25 +318,6 @@ export function aggregatePortfolioManager(
     };
   }
 
-  const weights: Record<AnalysisAgentType, number> = {
-    TECHNICAL_ANALYST: 0.26,
-    NEWS_ANALYST: 0.2,
-    FUNDAMENTALS_ANALYST: 0.3,
-    RISK_ANALYST: 0.24,
-    MACRO_ANALYST: 0.12,
-    SENTIMENT_ANALYST: 0.1,
-    QUANT_ANALYST: 0.16,
-    CRYPTO_SPECIALIST: 0.06,
-    BULL_RESEARCHER: 0.12,
-    BEAR_RESEARCHER: 0.12,
-    TRADER_AGENT: 0.2,
-    AGGRESSIVE_RISK: 0.08,
-    NEUTRAL_RISK: 0.1,
-    CONSERVATIVE_RISK: 0.12,
-    PORTFOLIO_MANAGER: 0,
-    TEAM_LEAD: 0
-  };
-
   let totalWeight = 0;
   let totalScore = 0;
   const reasons: string[] = [];
@@ -310,7 +326,7 @@ export function aggregatePortfolioManager(
   for (const rec of completed) {
     const agentType = rec.agentType as AnalysisAgentType;
     const confidence = clamp(rec.confidence ?? 0.5, 0.2, 0.95);
-    const weight = (weights[agentType] ?? 0.2) * confidence;
+    const weight = (MANAGER_WEIGHTS[agentType] ?? 0.2) * confidence;
     const recommendation = rec.recommendation as Recommendation;
     totalScore += stanceScore[recommendation] * weight;
     totalWeight += weight;
@@ -353,6 +369,92 @@ export function aggregatePortfolioManager(
       conflict ? "Specialists disagreed, so confidence was moderated." : "Specialists were broadly aligned.",
       coverage < 1 ? "Partial investment-committee coverage lowered confidence." : "All investment-committee outputs were available."
     ]
+  };
+}
+
+export function buildAnalysisExplanation(run: {
+  id: string;
+  ticker: string;
+  status: string;
+  finalRec?: Recommendation | null;
+  finalSummary?: string | null;
+  errorReason?: string | null;
+  recommendations: AgentEvidence[];
+}) {
+  const byAgent = new Map(run.recommendations.map((rec) => [rec.agentType, rec]));
+  const stanceScore: Record<Recommendation, number> = { BUY: 72, HOLD: 50, AVOID: 28 };
+  const voteMix: Record<Recommendation, number> = { BUY: 0, HOLD: 0, AVOID: 0 };
+  let weightedScore = 0;
+  let weightedConfidence = 0;
+  let totalWeight = 0;
+
+  const agents = AGENT_PROFILES.map((profile) => {
+    const rec = byAgent.get(profile.id);
+    const recommendation = isRecommendation(rec?.recommendation) ? rec.recommendation : null;
+    const confidence = clamp(rec?.confidence ?? 0, 0, 1);
+    const effectiveWeight = recommendation ? profile.defaultWeight * clamp(confidence || 0.5, 0.2, 0.95) : 0;
+    const contribution = recommendation ? stanceScore[recommendation] * effectiveWeight : 0;
+    if (recommendation) {
+      voteMix[recommendation] += 1;
+      weightedScore += contribution;
+      weightedConfidence += confidence * effectiveWeight;
+      totalWeight += effectiveWeight;
+    }
+
+    return {
+      agentType: profile.id,
+      label: profile.label,
+      role: profile.role,
+      stage: profile.stage,
+      description: profile.description,
+      status: rec?.status ?? "PENDING",
+      recommendation,
+      confidence: rec?.confidence ?? null,
+      baseWeight: profile.defaultWeight,
+      effectiveWeight: round(effectiveWeight, 4),
+      contribution: round(contribution, 2),
+      summary: rec?.summary ?? null,
+      reasons: normalizeReasons(rec?.reasons),
+      errorReason: rec?.errorReason ?? null
+    };
+  });
+
+  const completedAgents = agents.filter((agent) => agent.status === "COMPLETED" && agent.agentType !== "PORTFOLIO_MANAGER");
+  const failedAgents = agents.filter((agent) => agent.status === "FAILED");
+  const missingAgents = agents.filter((agent) => agent.status === "PENDING" || agent.status === "RUNNING");
+  const manager = agents.find((agent) => agent.agentType === "PORTFOLIO_MANAGER");
+  const score = totalWeight > 0 ? weightedScore / totalWeight : 50;
+  const conflict = [voteMix.BUY, voteMix.HOLD, voteMix.AVOID].filter((count) => count > 0).length > 1;
+  const topContributors = agents
+    .filter((agent) => agent.agentType !== "PORTFOLIO_MANAGER" && agent.contribution > 0)
+    .sort((a, b) => b.effectiveWeight - a.effectiveWeight)
+    .slice(0, 5)
+    .map((agent) => agent.agentType);
+
+  const caveats: string[] = [];
+  if (failedAgents.length > 0) caveats.push(`${failedAgents.length} agent${failedAgents.length === 1 ? "" : "s"} failed and were excluded from scoring.`);
+  if (missingAgents.length > 0) caveats.push(`${missingAgents.length} agent${missingAgents.length === 1 ? "" : "s"} had not completed when this explanation was generated.`);
+  if (conflict) caveats.push("Committee recommendations conflict, so confidence is moderated.");
+  if (totalWeight === 0) caveats.push("No usable completed recommendations were available; fallback is HOLD.");
+
+  return {
+    analysisRunId: run.id,
+    ticker: run.ticker.toUpperCase(),
+    status: run.status,
+    finalRec: run.finalRec ?? null,
+    finalSummary: run.finalSummary ?? null,
+    managerScore: round(score, 1),
+    managerConfidence: manager?.confidence ?? (totalWeight > 0 ? round(weightedConfidence / totalWeight, 2) : 0.45),
+    voteMix,
+    coverage: {
+      completed: completedAgents.length,
+      total: AGENT_PROFILES.filter((agent) => agent.id !== "PORTFOLIO_MANAGER").length,
+      failed: failedAgents.length,
+      pending: missingAgents.length
+    },
+    topContributors,
+    caveats,
+    agents
   };
 }
 
@@ -936,6 +1038,10 @@ function riskPenaltyFromContext(context: MarketContext) {
 function firstReason(item: AgentEvidence) {
   const reasons = Array.isArray(item.reasons) ? item.reasons : [];
   return reasons.find((reason): reason is string => typeof reason === "string" && reason.length > 0) ?? item.summary ?? "specialist evidence was directionally supportive.";
+}
+
+function normalizeReasons(value: unknown) {
+  return Array.isArray(value) ? value.filter((reason): reason is string => typeof reason === "string") : [];
 }
 
 function firstCompletedSummary(evidence: AgentEvidence[]) {

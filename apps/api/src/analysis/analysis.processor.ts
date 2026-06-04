@@ -5,7 +5,7 @@ import { AiService } from "../ai/ai.service";
 import { MarketService } from "../market/market.service";
 import { EventsGateway } from "../ws/events.gateway";
 import { AnalysisService } from "./analysis.service";
-import { buildAgentAnalysis } from "@pixelfund/domain";
+import { ANALYSIS_PIPELINE, buildAgentAnalysis } from "@pixelfund/domain";
 import type { AgentType } from "@prisma/client";
 
 @Processor("analysis")
@@ -30,24 +30,7 @@ export class AnalysisProcessor extends WorkerHost {
 
     try {
       const context = await this.market.context(ticker);
-      const specialists = [
-        "TECHNICAL_ANALYST",
-        "NEWS_ANALYST",
-        "FUNDAMENTALS_ANALYST",
-        "RISK_ANALYST",
-        "MACRO_ANALYST",
-        "SENTIMENT_ANALYST",
-        "QUANT_ANALYST",
-        "CRYPTO_SPECIALIST"
-      ] as const;
-      const debateAgents = ["BULL_RESEARCHER", "BEAR_RESEARCHER"] as const;
-      const riskCouncil = ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"] as const;
-
-      for (const agent of specialists) await this.runAgent(analysisRunId, agent, ticker, context);
-      for (const agent of debateAgents) await this.runAgent(analysisRunId, agent, ticker, context);
-      await this.runAgent(analysisRunId, "TRADER_AGENT", ticker, context);
-      for (const agent of riskCouncil) await this.runAgent(analysisRunId, agent, ticker, context);
-      await this.runAgent(analysisRunId, "TEAM_LEAD", ticker, context);
+      for (const agent of ANALYSIS_PIPELINE) await this.runAgent(analysisRunId, agent as AgentType, ticker, context);
 
       await this.analysis.finalizeManager(analysisRunId);
     } catch (error) {

@@ -5,6 +5,7 @@ import { createIntegrationApp, resetDb, waitFor } from "./test-app";
 import { PrismaService } from "../../src/common/prisma.service";
 import {
   analysisRunSchema,
+  analysisExplanationSchema,
   backtestResultSchema,
   marketContextSchema,
   portfolioSchema,
@@ -96,6 +97,11 @@ describe("http integration", () => {
       ].sort()
     );
     expect(run.recommendations.find((r: any) => r.agentType === "TRADER_AGENT")?.summary).toBeTruthy();
+
+    const explanation = await request(server).get(`/analysis-runs/${first.body.data.id}/explain`).expect(200);
+    const parsedExplanation = analysisExplanationSchema.parse(explanation.body.data);
+    expect(parsedExplanation.coverage.completed).toBeGreaterThan(0);
+    expect(parsedExplanation.agents.find((agent) => agent.agentType === "PORTFOLIO_MANAGER")?.baseWeight).toBe(0);
   });
 
   test("trade updates portfolio accounting", async () => {

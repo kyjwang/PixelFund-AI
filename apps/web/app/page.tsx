@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { io, Socket } from "socket.io-client";
 import { z } from "zod";
 import { APP_DISCLAIMER } from "@pixelfund/config";
 import {
   analysisRunSchema,
-  backtestResultSchema,
+  analysisExplanationSchema,
   marketContextSchema,
   portfolioSchema,
   quoteSchema,
@@ -15,37 +16,30 @@ import {
   watchlistItemSchema,
   wsQuoteStaleSchema
 } from "@pixelfund/schemas";
+import {
+  AchievementToast,
+  AgentCard,
+  DialogueBox,
+  MissionPanel,
+  PixelButton,
+  PixelCard,
+  PortfolioHud,
+  StockSearchPanel,
+  TeamDecisionPanel
+} from "../components/GameUI";
 import { gameAgents, PixelOffice } from "../components/PixelOffice";
 import { api } from "../lib/api";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
 const stockSearchSchema = z.array(z.object({ symbol: z.string(), description: z.string() }));
-const meetingSteps = [
-  { agentId: "TECHNICAL_ANALYST", log: "Technical Analyst is checking price action..." },
-  { agentId: "FUNDAMENTALS_ANALYST", log: "Fundamentals Analyst is reviewing valuation..." },
-  { agentId: "NEWS_ANALYST", log: "News Analyst is scanning headlines..." },
-  { agentId: "RISK_ANALYST", log: "Risk Manager is checking downside risk..." },
-  { agentId: "MACRO_ANALYST", log: "Macro Analyst is checking rates and market regime..." },
-  { agentId: "SENTIMENT_ANALYST", log: "Sentiment Analyst is reading the crowd pulse..." },
-  { agentId: "QUANT_ANALYST", log: "Quant Analyst is ranking factor signals..." },
-  { agentId: "CRYPTO_SPECIALIST", log: "Crypto Specialist is checking liquidity spillover..." },
-  { agentId: "BULL_RESEARCHER", log: "Bull Researcher is building the strongest upside case..." },
-  { agentId: "BEAR_RESEARCHER", log: "Bear Researcher is challenging the setup..." },
-  { agentId: "TRADER_AGENT", log: "Trader Agent is converting debate into an execution plan..." },
-  { agentId: "AGGRESSIVE_RISK", log: "Aggressive Risk is checking if reward justifies volatility..." },
-  { agentId: "NEUTRAL_RISK", log: "Neutral Risk is balancing reward against uncertainty..." },
-  { agentId: "CONSERVATIVE_RISK", log: "Conservative Risk is protecting against drawdown..." },
-  { agentId: "PORTFOLIO_MANAGER", log: "Portfolio Manager is reviewing allocation impact..." },
-  { agentId: "TEAM_LEAD", log: "Team Lead is preparing final summary..." }
-];
 
 type Portfolio = z.infer<typeof portfolioSchema>;
 type AnalysisRun = z.infer<typeof analysisRunSchema>;
+type AnalysisExplanation = z.infer<typeof analysisExplanationSchema>;
 type WatchlistItem = z.infer<typeof watchlistItemSchema>;
 type Quote = z.infer<typeof quoteSchema>;
 type MarketContext = z.infer<typeof marketContextSchema>;
 type Trade = z.infer<typeof tradeSchema>;
-type BacktestResult = z.infer<typeof backtestResultSchema>;
 type TradePreview = z.infer<typeof tradePreviewSchema>;
 
 export default function HomePage() {
@@ -53,14 +47,12 @@ export default function HomePage() {
   const [searchResults, setSearchResults] = useState<Array<{ symbol: string; description: string }>>([]);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
+  const [analysisExplanation, setAnalysisExplanation] = useState<AnalysisExplanation | null>(null);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>("TECHNICAL_ANALYST");
   const [agentUiStatuses, setAgentUiStatuses] = useState<Record<string, string>>({});
   const [agentMockAnalysis, setAgentMockAnalysis] = useState<Record<string, string>>({});
-  const [meetingLog, setMeetingLog] = useState<string[]>([]);
-  const [isMeetingRunning, setIsMeetingRunning] = useState(false);
-  const [pinnedInsights, setPinnedInsights] = useState<string[]>([]);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -70,10 +62,10 @@ export default function HomePage() {
   const [stopPrice, setStopPrice] = useState<number | "">("");
   const [tradePreview, setTradePreview] = useState<TradePreview | null>(null);
   const [quoteStale, setQuoteStale] = useState(false);
-  const [backtest, setBacktest] = useState<BacktestResult | null>(null);
-  const [isBacktesting, setIsBacktesting] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [achievement, setAchievement] = useState<{ title: string; detail: string } | null>(null);
+  const [hasAskedTeam, setHasAskedTeam] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const tickerRef = useRef(ticker);
@@ -244,6 +236,22 @@ export default function HomePage() {
     [runs, ticker]
   );
 
+  useEffect(() => {
+    if (!latest?.id) {
+      setAnalysisExplanation(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    void api(`/analysis-runs/${encodeURIComponent(latest.id)}/explain`, analysisExplanationSchema, {
+      signal: controller.signal
+    })
+      .then(setAnalysisExplanation)
+      .catch(() => setAnalysisExplanation(null));
+
+    return () => controller.abort();
+  }, [latest?.id, latest?.updatedAt]);
+
   const selected = useMemo(
     () => latest?.recommendations?.find((r) => r.agentType === selectedAgent),
     [latest, selectedAgent]
@@ -259,35 +267,13 @@ export default function HomePage() {
     [latest]
   );
 
-  const bullResearcher = useMemo(
-    () => latest?.recommendations?.find((r) => r.agentType === "BULL_RESEARCHER"),
-    [latest]
-  );
-
-  const bearResearcher = useMemo(
-    () => latest?.recommendations?.find((r) => r.agentType === "BEAR_RESEARCHER"),
-    [latest]
-  );
-
-  const traderAgent = useMemo(
-    () => latest?.recommendations?.find((r) => r.agentType === "TRADER_AGENT"),
-    [latest]
-  );
-
-  const riskCouncil = useMemo(
-    () =>
-      ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"].map((agentType) =>
-        latest?.recommendations?.find((r) => r.agentType === agentType)
-      ),
-    [latest]
-  );
-
   const completedCommittee = useMemo(
     () => (latest?.recommendations ?? []).filter((r) => r.status === "COMPLETED" && r.agentType !== "PORTFOLIO_MANAGER"),
     [latest]
   );
 
   const voteMix = useMemo(() => {
+    if (analysisExplanation) return analysisExplanation.voteMix;
     const mix = { BUY: 0, HOLD: 0, AVOID: 0 };
     for (const rec of completedCommittee) {
       if (rec.recommendation === "BUY" || rec.recommendation === "HOLD" || rec.recommendation === "AVOID") {
@@ -295,7 +281,10 @@ export default function HomePage() {
       }
     }
     return mix;
-  }, [completedCommittee]);
+  }, [analysisExplanation, completedCommittee]);
+
+  const explanationAgents = analysisExplanation?.agents ?? [];
+  const selectedExplanation = explanationAgents.find((agent) => agent.agentType === selectedAgent);
 
   const agentStatuses = useMemo(() => {
     const map: Record<string, string | undefined> = {};
@@ -364,6 +353,9 @@ export default function HomePage() {
     const normalized = targetTicker.trim().toUpperCase() || "AAPL";
     setTicker(normalized);
     setIsAnalyzing(true);
+    setHasAskedTeam(true);
+    setAchievement({ title: "Committee Convened", detail: `${normalized} is now on the AI team's desk.` });
+    window.setTimeout(() => setAchievement(null), 3200);
     try {
       const run = await api("/analysis-runs", analysisRunSchema, {
         method: "POST",
@@ -378,32 +370,11 @@ export default function HomePage() {
     }
   }
 
-  async function runBacktest() {
-    const normalized = tickerRef.current.trim().toUpperCase() || "AAPL";
-    setIsBacktesting(true);
-    try {
-      const to = new Date();
-      const from = new Date(to.getTime() - 1000 * 60 * 60 * 24 * 365);
-      const result = await api("/backtests", backtestResultSchema, {
-        method: "POST",
-        body: JSON.stringify({
-          ticker: normalized,
-          from: from.toISOString().slice(0, 10),
-          to: to.toISOString().slice(0, 10),
-          strategy: "PORTFOLIO_MANAGER_REPLAY"
-        })
-      });
-      setBacktest(result);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Backtest failed");
-    } finally {
-      setIsBacktesting(false);
-    }
-  }
-
   function askSelectedAgent() {
     const agent = selectedGameAgent;
+    setHasAskedTeam(true);
+    setAchievement({ title: "Agent Consulted", detail: `${agent.name} added a new desk note.` });
+    window.setTimeout(() => setAchievement(null), 3200);
     setAgentUiStatuses((statuses) => ({ ...statuses, [agent.id]: "THINKING" }));
     window.setTimeout(() => {
       const marketTone = quoteChangePositive ? "price action is constructive" : "price action is under pressure";
@@ -414,53 +385,6 @@ export default function HomePage() {
       }));
       setAgentUiStatuses((statuses) => ({ ...statuses, [agent.id]: "COMPLETED" }));
     }, 900);
-  }
-
-  function pinSelectedInsight() {
-    const agent = selectedGameAgent;
-    const insight = agentMockAnalysis[agent.id] ?? selected?.summary ?? agent.mockAnalysis;
-    setPinnedInsights((items) => [`${agent.role}: ${insight}`, ...items].slice(0, 5));
-  }
-
-  function startTeamMeeting() {
-    if (isMeetingRunning) return;
-    setIsMeetingRunning(true);
-    setMeetingLog([]);
-    setAgentUiStatuses((statuses) => {
-      const next = { ...statuses };
-      for (const step of meetingSteps) next[step.agentId] = "IDLE";
-      return next;
-    });
-
-    meetingSteps.forEach((step, idx) => {
-      window.setTimeout(() => {
-        setSelectedAgent(step.agentId);
-        setAgentUiStatuses((statuses) => ({ ...statuses, [step.agentId]: "THINKING" }));
-        setMeetingLog((items) => [...items, step.log]);
-      }, idx * 650);
-
-      window.setTimeout(() => {
-        setAgentUiStatuses((statuses) => ({ ...statuses, [step.agentId]: "COMPLETED" }));
-        if (idx === meetingSteps.length - 1) {
-          setMeetingLog((items) => [...items, "Team Lead: final desk summary is ready for review."]);
-          setIsMeetingRunning(false);
-        }
-      }, idx * 650 + 480);
-    });
-  }
-
-  async function addWatchlist() {
-    const item = await api("/watchlist", watchlistItemSchema, {
-      method: "POST",
-      body: JSON.stringify({ ticker })
-    });
-    setWatchlist((items) => [item, ...items.filter((x) => x.ticker !== item.ticker)]);
-    scheduleRefresh(ticker);
-  }
-
-  async function removeWatchlist(symbol: string) {
-    await api(`/watchlist/${encodeURIComponent(symbol)}`, z.object({ ticker: z.string() }), { method: "DELETE" });
-    setWatchlist((items) => items.filter((x) => x.ticker !== symbol));
   }
 
   useEffect(() => {
@@ -489,71 +413,61 @@ export default function HomePage() {
   const dataQualityStatus = marketContext?.dataQuality.status ?? "DEMO";
   const accountValue = portfolio?.totalValue ?? 0;
   const pnlPercent = portfolio && portfolio.totalValue > 0 ? (portfolio.totalPnl / Math.max(1, portfolio.totalValue - portfolio.totalPnl)) * 100 : 0;
-  const hitRate = backtest ? Math.round(backtest.winRate * 100) : 70;
+  const hitRate = 70;
   const terminalStatus = agentStatuses[selectedGameAgent.id] ?? selected?.status ?? "IDLE";
   const terminalSignal = selected?.recommendation ?? selectedGameAgent.signal;
   const terminalConfidence =
     typeof selected?.confidence === "number" ? Math.round(selected.confidence * 100) : selectedGameAgent.confidence;
   const terminalAnalysis = agentMockAnalysis[selectedGameAgent.id] ?? selected?.summary ?? selectedGameAgent.mockAnalysis;
+  const completedAnalyses = runs.filter((run) => run.status === "COMPLETED").length;
+  const xpLevel = Math.max(1, Math.floor((completedAnalyses + (trades.length > 0 ? 1 : 0) + watchlist.length) / 3) + 1);
+  const streak = (portfolio?.totalPnl ?? 0) >= 0 ? `W${Math.max(1, Math.min(9, completedAnalyses || 1))}` : "L1";
+  const portfolioMood = (portfolio?.totalPnl ?? 0) > 0 ? "Bullish" : (portfolio?.totalPnl ?? 0) < 0 ? "Bruised" : "Curious";
 
   return (
-    <main className="min-h-screen bg-[#edf6f9] text-slate-950" aria-label="pixelFund AI trading simulation">
+    <main className="min-h-screen text-slate-950" aria-label="pixelFund AI trading simulation">
+      <AchievementToast show={Boolean(achievement)} title={achievement?.title ?? ""} detail={achievement?.detail ?? ""} />
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-3 pb-32 pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-5">
-        <header className="grid gap-3 rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card lg:grid-cols-[1.2fr_0.8fr]">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-pixel text-base md:text-xl">PixelTrade AI</h1>
-              <span className={badgeClass(finalRec)} aria-label={`Final recommendation ${finalRec}`}>
-                Final Rec: {finalRec}
-              </span>
-              <span className={`border-2 border-slate-950 px-2 py-1 text-xs font-semibold ${socketConnected ? "bg-emerald-200" : "bg-red-200"}`}>
-                {socketConnected ? "Live socket" : "Reconnecting"}
-              </span>
-            </div>
-            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-5">
-              <HudChip label="Cash" value={formatMoney(portfolio?.cash ?? 10000)} />
-              <HudChip label="Portfolio" value={formatMoney(accountValue || 12430)} />
-              <HudChip label="P/L" value={formatSignedPercent(pnlPercent || 4.2)} tone={(pnlPercent || 4.2) >= 0 ? "good" : "bad"} />
-              <HudChip label="Hit Rate" value={`${hitRate}%`} />
-              <HudChip label="Desk" value={selectedGameAgent.label} />
-            </div>
-            <p className="mt-2 max-w-3xl text-xs text-slate-700 sm:text-sm">{APP_DISCLAIMER}</p>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-            <div className="relative">
-              <label className="mb-1 block text-xs font-semibold text-slate-700" htmlFor="ticker-input">
-                Ticker
-              </label>
-              <input
-                id="ticker-input"
-                value={ticker}
-                onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                className="h-12 w-full border-2 border-black bg-[#f7fff7] px-3 text-base font-semibold"
-                aria-label="Ticker"
-              />
-              {searchResults.length > 0 ? (
-                <div className="absolute z-20 mt-2 grid w-full gap-1 border-2 border-black bg-white p-2 shadow-[4px_4px_0_#111]">
-                  {searchResults.map((item) => (
-                    <button
-                      key={item.symbol}
-                      className="grid grid-cols-[74px_1fr] items-center gap-2 border border-black px-2 py-1 text-left text-xs hover:bg-[#d9f0e8]"
-                      onClick={() => void selectTicker(item.symbol)}
-                    >
-                      <span className="font-semibold">{item.symbol}</span>
-                      <span className="truncate text-slate-600">{item.description}</span>
-                    </button>
-                  ))}
+        <header className="grid gap-4">
+          <PixelCard className="bg-[#fff8e7]">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="font-pixel text-lg leading-8 md:text-2xl">PixelTrade AI</h1>
+                  <span className={badgeClass(finalRec)} aria-label={`Final recommendation ${finalRec}`}>
+                    Final Rec: {finalRec}
+                  </span>
+                  <span className={`border-2 border-slate-950 px-2 py-1 text-xs font-semibold ${socketConnected ? "bg-emerald-200" : "bg-red-200"}`}>
+                    {socketConnected ? "Live socket" : "Reconnecting"}
+                  </span>
                 </div>
-              ) : null}
+                <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-700 sm:text-sm">{APP_DISCLAIMER}</p>
+              </div>
             </div>
-            <button
-              className="h-12 self-end border-2 border-black bg-[#0c7c59] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-500"
-              onClick={() => void runAnalysis()}
-              disabled={isAnalyzing}
-            >
-              {isAnalyzing ? "Analyzing" : "Run Analysis"}
-            </button>
+            <div className="mt-4">
+              <PortfolioHud
+                cash={formatMoney(portfolio?.cash ?? 10000)}
+                portfolioValue={formatMoney(accountValue || 12430)}
+                pnlPercent={formatSignedPercent(pnlPercent || 4.2)}
+                hitRate={`${hitRate}%`}
+                selectedDesk={selectedGameAgent.label}
+                level={xpLevel}
+                streak={streak}
+                mood={portfolioMood}
+              />
+            </div>
+          </PixelCard>
+
+          <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+            <StockSearchPanel
+              ticker={ticker}
+              results={searchResults}
+              isAnalyzing={isAnalyzing}
+              onTickerChange={setTicker}
+              onSelectTicker={(symbol) => void selectTicker(symbol)}
+              onAnalyze={() => void runAnalysis()}
+            />
+            <MissionPanel analyzedCount={completedAnalyses} watchlistCount={watchlist.length} askedTeam={hasAskedTeam} />
           </div>
         </header>
 
@@ -675,18 +589,12 @@ export default function HomePage() {
                 ) : null}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  className={`h-9 border-2 border-black px-3 text-xs font-semibold ${previewSide === "BUY" ? "bg-emerald-200" : "bg-white"}`}
-                  onClick={() => setPreviewSide("BUY")}
-                >
+                <PixelButton tone={previewSide === "BUY" ? "good" : "neutral"} onClick={() => setPreviewSide("BUY")}>
                   Preview Buy
-                </button>
-                <button
-                  className={`h-9 border-2 border-black px-3 text-xs font-semibold ${previewSide === "SELL" ? "bg-slate-200" : "bg-white"}`}
-                  onClick={() => setPreviewSide("SELL")}
-                >
+                </PixelButton>
+                <PixelButton tone={previewSide === "SELL" ? "warn" : "neutral"} onClick={() => setPreviewSide("SELL")}>
                   Preview Sell
-                </button>
+                </PixelButton>
               </div>
               <div className="mt-3 grid gap-1 text-xs">
                 <p>Estimated cost/proceeds: {formatMoney(tradeEstimate.gross)}</p>
@@ -710,83 +618,82 @@ export default function HomePage() {
                 </div>
               ) : null}
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button className="h-11 border-2 border-black bg-[#1b4332] px-3 text-xs font-semibold text-white" onClick={() => { setPreviewSide("BUY"); void placeTrade("BUY"); }}>
+                <PixelButton tone="good" onClick={() => { setPreviewSide("BUY"); void placeTrade("BUY"); }}>
                   Buy {tradeEstimate.qty}
-                </button>
-                <button className="h-11 border-2 border-black bg-[#2f4858] px-3 text-xs font-semibold text-white" onClick={() => { setPreviewSide("SELL"); void placeTrade("SELL"); }}>
+                </PixelButton>
+                <PixelButton tone="neutral" onClick={() => { setPreviewSide("SELL"); void placeTrade("SELL"); }}>
                   Sell {tradeEstimate.qty}
-                </button>
+                </PixelButton>
               </div>
             </section>
           </div>
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[1fr_1fr]" aria-label="Agent and portfolio panels">
-          <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-pixel text-[10px] sm:text-xs">Agent Terminal</h2>
-              <span className={badgeClass(String(terminalSignal))}>{terminalSignal}</span>
-            </div>
-            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-              <Metric label="Agent" value={selectedGameAgent.name} />
-              <Metric label="Role" value={selectedGameAgent.role} />
-              <Metric label="Personality" value={selectedGameAgent.personality} />
-              <Metric label="Current Status" value={terminalStatus} tone={terminalStatus === "FAILED" ? "bad" : terminalStatus === "COMPLETED" ? "good" : undefined} />
-              <Metric label="Current Signal" value={String(terminalSignal)} />
-              <Metric label="Confidence" value={`${terminalConfidence}%`} />
-            </div>
-            <p className="mt-3 min-h-20 border-2 border-black bg-[#0f172a] p-3 font-mono text-xs leading-6 text-[#bbf7d0]">
-              {terminalAnalysis}
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                className="h-10 border-2 border-black bg-[#0c7c59] px-3 text-xs font-semibold text-white disabled:bg-slate-500"
-                onClick={askSelectedAgent}
-                disabled={terminalStatus === "THINKING"}
-              >
-                Ask this agent
-              </button>
-              <button
-                className="h-10 border-2 border-black bg-[#2f4858] px-3 text-xs font-semibold text-white"
-                onClick={pinSelectedInsight}
-              >
-                Pin insight
-              </button>
-            </div>
-            <div className="mt-3 grid gap-2">
-              {(selected?.reasons ?? []).map((reason, idx) => (
-                <EvidenceReason key={`${selected?.id ?? "agent"}-r-${idx}`} reason={reason} />
-              ))}
-              {(selected?.reasons?.length ?? 0) === 0 ? <p className="text-xs text-slate-600">No structured reasons available yet.</p> : null}
-            </div>
-            <div className="mt-3 grid gap-2 border-2 border-black bg-[#edf6f9] p-2 text-xs">
-              <p className="font-semibold">Evidence Quality</p>
-              <p>Status: {dataQualityStatus} | Provider: {marketContext?.dataQuality.provider ?? "loading"} | Score: {Math.round(dataQuality * 100)}%</p>
-              <p>{marketContext?.dataQuality.messages[0] ?? "Evidence status will appear after market data loads."}</p>
-            </div>
-            <div className="mt-3 grid gap-2 border-2 border-black bg-[#f7fff7] p-2 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold">Manager Weighting</p>
-                <span>{completedCommittee.length}/14 agents complete</span>
+          <div className="grid gap-4">
+            <DialogueBox
+              speaker={selectedGameAgent.name}
+              role={selectedGameAgent.role}
+              status={terminalStatus.toLowerCase()}
+              signal={String(terminalSignal).toLowerCase()}
+              confidence={`${terminalConfidence}% confidence`}
+              text={selectedExplanation?.description ? `${selectedExplanation.description} ${terminalAnalysis}` : terminalAnalysis}
+            >
+              <div className="grid gap-2 sm:grid-cols-2">
+                <PixelButton tone="good" onClick={askSelectedAgent} disabled={terminalStatus === "THINKING"}>
+                  Ask this agent
+                </PixelButton>
+                <Link
+                  href="/research"
+                  className="pixel-button min-h-10 border-2 border-black bg-[#fff8e7] px-3 py-2 text-center text-xs font-black uppercase text-slate-950 shadow-[4px_4px_0_#111] transition-transform hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#111] active:translate-x-1 active:translate-y-1 active:shadow-none"
+                >
+                  Open Research
+                </Link>
               </div>
-              <p>Votes: {voteMix.BUY} BUY | {voteMix.HOLD} HOLD | {voteMix.AVOID} AVOID</p>
-              <div className="grid gap-1 sm:grid-cols-2">
-                {completedCommittee.slice(0, 6).map((rec) => (
-                  <button
-                    key={rec.id}
-                    className="grid grid-cols-[1fr_auto] gap-2 border border-black bg-white px-2 py-1 text-left hover:bg-[#d9f0e8]"
-                    onClick={() => setSelectedAgent(rec.agentType)}
-                  >
-                    <span className="truncate">{agentLabel(rec.agentType)}</span>
-                    <span className="font-semibold">{rec.recommendation ?? rec.status} {typeof rec.confidence === "number" ? `${Math.round(rec.confidence * 100)}%` : ""}</span>
-                  </button>
+              <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                <Metric label="Personality" value={selectedGameAgent.personality} />
+                <Metric label="Stage" value={selectedExplanation?.stage.replace("_", " ") ?? "LOCAL"} />
+                <Metric label="Manager Weight" value={`${Math.round((selectedExplanation?.baseWeight ?? 0) * 100)}%`} />
+                <Metric label="Evidence" value={`${dataQualityStatus} ${Math.round(dataQuality * 100)}%`} />
+              </div>
+              <div className="mt-3 grid gap-2">
+                {(selected?.reasons ?? []).map((reason, idx) => (
+                  <EvidenceReason key={`${selected?.id ?? "agent"}-r-${idx}`} reason={reason} />
                 ))}
+                {(selected?.reasons?.length ?? 0) === 0 ? <p className="text-xs text-slate-600">No structured reasons available yet.</p> : null}
               </div>
-              {(portfolioManager?.reasons ?? []).slice(0, 3).map((reason, idx) => (
-                <EvidenceReason key={`pm-weight-${idx}`} reason={reason} />
+            </DialogueBox>
+
+            <TeamDecisionPanel
+              score={analysisExplanation ? String(Math.round(analysisExplanation.managerScore)) : undefined}
+              confidence={analysisExplanation ? `${Math.round(analysisExplanation.managerConfidence * 100)}%` : undefined}
+              coverageText={analysisExplanation ? `${analysisExplanation.coverage.completed}/${analysisExplanation.coverage.total}` : `${completedCommittee.length}/14`}
+              voteText={`${voteMix.BUY} BUY | ${voteMix.HOLD} HOLD | ${voteMix.AVOID} AVOID`}
+              caveats={analysisExplanation?.caveats ?? []}
+            >
+              {explanationAgents.length > 0 ? explanationAgents.filter((agent) => agent.agentType !== "PORTFOLIO_MANAGER").map((agent) => (
+                <AgentCard
+                  key={agent.agentType}
+                  role={`${agent.role}${analysisExplanation?.topContributors.includes(agent.agentType) ? " *" : ""}`}
+                  status={agent.status}
+                  recommendation={agent.recommendation}
+                  confidence={agent.confidence}
+                  selected={selectedAgent === agent.agentType}
+                  onSelect={() => setSelectedAgent(agent.agentType)}
+                />
+              )) : completedCommittee.slice(0, 6).map((rec) => (
+                <AgentCard
+                  key={rec.id}
+                  role={agentLabel(rec.agentType)}
+                  status={rec.status}
+                  recommendation={rec.recommendation}
+                  confidence={rec.confidence}
+                  selected={selectedAgent === rec.agentType}
+                  onSelect={() => setSelectedAgent(rec.agentType)}
+                />
               ))}
-            </div>
-          </section>
+            </TeamDecisionPanel>
+          </div>
 
           <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
             <h2 className="font-pixel text-[10px] sm:text-xs">Portfolio</h2>
@@ -817,188 +724,24 @@ export default function HomePage() {
           </section>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-[1fr_0.8fr]" aria-label="Team meeting and pinned insights">
-          <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-pixel text-[10px] sm:text-xs">Team Meeting</h2>
-              <button
-                className="h-10 border-2 border-black bg-[#7c3aed] px-3 text-xs font-semibold text-white disabled:bg-slate-500"
-                onClick={startTeamMeeting}
-                disabled={isMeetingRunning}
-              >
-                {isMeetingRunning ? "Meeting running" : "Start Team Meeting"}
-              </button>
-            </div>
-            <div className="mt-3 max-h-56 overflow-auto border-2 border-black bg-[#0f172a] p-2 font-mono text-xs text-[#bbf7d0]">
-              {meetingLog.length === 0 ? (
-                <p>Waiting for the desk captain to call the room...</p>
-              ) : (
-                meetingLog.map((item, idx) => (
-                  <p key={`${item}-${idx}`} className="border-b border-[#14532d] py-1 last:border-b-0">
-                    {idx + 1}. {item}
-                  </p>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
-            <h2 className="font-pixel text-[10px] sm:text-xs">Pinned Insights</h2>
-            <div className="mt-3 grid gap-2">
-              {pinnedInsights.length === 0 ? (
-                <p className="border-2 border-black bg-[#f7fff7] p-2 text-xs text-slate-700">Pinned agent insights will appear here.</p>
-              ) : (
-                pinnedInsights.map((item, idx) => (
-                  <p key={`${item}-${idx}`} className="border-2 border-black bg-[#f7fff7] p-2 text-xs leading-5">
-                    {item}
-                  </p>
-                ))
-              )}
-            </div>
-          </section>
-        </section>
-
-        <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4" aria-label="Debate Floor">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-pixel text-[10px] sm:text-xs">Debate Floor</h2>
-            <span className="border-2 border-black bg-[#edf6f9] px-2 py-1 text-xs font-semibold">
-              Bull vs Bear | Trader Plan | Risk Council
-            </span>
-          </div>
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <DebateCard title="Bull Researcher" result={bullResearcher} tone="good" onSelect={() => setSelectedAgent("BULL_RESEARCHER")} />
-            <DebateCard title="Bear Researcher" result={bearResearcher} tone="bad" onSelect={() => setSelectedAgent("BEAR_RESEARCHER")} />
-          </div>
-          <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_1.4fr]">
-            <DebateCard title="Trader Plan" result={traderAgent} tone="neutral" onSelect={() => setSelectedAgent("TRADER_AGENT")} />
-            <div className="grid gap-3 md:grid-cols-3">
-              {riskCouncil.map((risk, idx) => (
-                <DebateCard
-                  key={risk?.agentType ?? idx}
-                  title={risk ? agentLabel(risk.agentType) : ["Aggressive Risk", "Neutral Risk", "Conservative Risk"][idx]}
-                  result={risk}
-                  tone={idx === 0 ? "good" : idx === 2 ? "bad" : "neutral"}
-                  onSelect={() => setSelectedAgent(risk?.agentType ?? ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"][idx])}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr_1fr]">
-          <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-pixel text-[10px] sm:text-xs">Watchlist</h2>
-              <button className="h-9 border-2 border-black bg-[#0c7c59] px-2 text-xs font-semibold text-white" onClick={() => void addWatchlist()}>
-                Add {ticker.toUpperCase()}
-              </button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {watchlist.length === 0 ? <p className="text-xs text-slate-700">No watchlist items yet.</p> : null}
-              {watchlist.map((item) => (
-                <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-1 border-2 border-black bg-[#f7fff7] px-2 py-1">
-                  <button className="text-xs font-semibold" onClick={() => void selectTicker(item.ticker)}>
-                    {item.ticker}
-                  </button>
-                  <button className="border-l border-black pl-2 text-xs text-red-800" onClick={() => void removeWatchlist(item.ticker)} aria-label={`Remove ${item.ticker}`}>
-                    x
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
-            <h2 className="font-pixel text-[10px] sm:text-xs">Recommendation History</h2>
-            <div className="mt-3 max-h-56 overflow-auto border-2 border-black">
-              {runs.map((run) => (
-                <button
-                  key={run.id}
-                  className="grid w-full grid-cols-[70px_1fr_82px] gap-2 border-b border-slate-200 px-2 py-2 text-left text-xs last:border-b-0 hover:bg-[#d9f0e8]"
-                  onClick={() => void selectTicker(run.ticker)}
-                >
-                  <span className="font-semibold">{run.ticker}</span>
-                  <span className="truncate">{run.finalSummary ?? "Analysis in progress"}</span>
-                  <span className="text-right font-semibold">{run.finalRec ?? run.status}</span>
-                </button>
-              ))}
-              {runs.length === 0 ? <p className="p-2 text-xs text-slate-600">No prior recommendations yet.</p> : null}
-            </div>
-          </section>
-
-          <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
-            <h2 className="font-pixel text-[10px] sm:text-xs">Trade History</h2>
-            <div className="mt-3 max-h-56 overflow-auto border-2 border-black">
-              {trades.map((trade) => (
-                <div key={trade.id} className="grid grid-cols-[52px_58px_1fr] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
-                  <span className={trade.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-slate-800"}>{trade.side}</span>
-                  <span>{trade.ticker}</span>
-                  <span className="text-right">{trade.quantity} @ {formatMoney(trade.price)} {trade.orderType ? `(${trade.orderType})` : ""}</span>
-                </div>
-              ))}
-              {trades.length === 0 ? <p className="p-2 text-xs text-slate-600">No trades yet.</p> : null}
-            </div>
-          </section>
-        </section>
-
-        <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-pixel text-[10px] sm:text-xs">Backtest Lab</h2>
-            <button
-              className="h-9 border-2 border-black bg-[#2f4858] px-3 text-xs font-semibold text-white disabled:bg-slate-500"
-              onClick={() => void runBacktest()}
-              disabled={isBacktesting}
-            >
-              {isBacktesting ? "Running" : `Backtest ${ticker.toUpperCase()}`}
-            </button>
-          </div>
-          <div className="mt-3 grid gap-2 text-xs sm:grid-cols-4">
-            <Metric label="P&L" value={formatMoney(backtest?.simulatedPnl ?? 0)} tone={(backtest?.simulatedPnl ?? 0) >= 0 ? "good" : "bad"} />
-            <Metric label="Win Rate" value={`${Math.round((backtest?.winRate ?? 0) * 100)}%`} />
-            <Metric label="Max Drawdown" value={`${Math.round((backtest?.maxDrawdown ?? 0) * 100)}%`} tone={(backtest?.maxDrawdown ?? 0) > 0.2 ? "bad" : undefined} />
-            <Metric label="Accuracy" value={`${Math.round((backtest?.recommendationAccuracy ?? 0) * 100)}%`} />
-          </div>
-          <p className="mt-3 text-xs text-slate-700">
-            {backtest
-              ? `${backtest.strategy} ran ${backtest.trades} simulated trades from ${backtest.from} to ${backtest.to}. ${backtest.dataQuality.messages[0] ?? ""}`
-              : "Run a one-year replay of the Portfolio Manager style signal against historical closes."}
-          </p>
-        </section>
-
-        <section className="rounded-[6px] border-4 border-slate-950 bg-white p-3 pixel-card sm:p-4">
-          <h2 className="font-pixel text-[10px] sm:text-xs">Evidence Snapshot</h2>
-          <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="P/E" value={displayNumber(marketContext?.fundamentals.peRatio)} />
-            <Metric label="Revenue Growth" value={displayPercent(marketContext?.fundamentals.revenueGrowth)} />
-            <Metric label="EPS Growth" value={displayPercent(marketContext?.fundamentals.epsGrowth)} />
-            <Metric label="Beta" value={displayNumber(marketContext?.fundamentals.beta)} />
-            <Metric label="52w High" value={displayMoney(marketContext?.fundamentals.week52High)} />
-            <Metric label="52w Low" value={displayMoney(marketContext?.fundamentals.week52Low)} />
-            <Metric label="52w Return" value={displayPercent(marketContext?.fundamentals.week52Return)} />
-            <Metric label="Analyst Trend" value={marketContext?.analystTrend?.consensus ?? "N/A"} />
-          </div>
-          <div className="mt-3 grid gap-2 lg:grid-cols-2">
-            {(marketContext?.news ?? []).slice(0, 4).map((item) => (
-              <p key={`${item.source}-${item.headline}`} className="border-2 border-black bg-[#f7fff7] px-2 py-2 text-xs leading-5">
-                <span className="font-semibold">{item.sentiment.toUpperCase()}</span> {item.headline}
-              </p>
-            ))}
-            {(marketContext?.news.length ?? 0) === 0 ? <p className="text-xs text-slate-600">No news evidence loaded.</p> : null}
-          </div>
+        <section className="grid gap-3 md:grid-cols-3" aria-label="More rooms">
+          <RoomLink href="/research" title="Research Room" detail="Agent debate, evidence, caveats, and team-meeting notes." />
+          <RoomLink href="/history" title="History Vault" detail="Watchlist, recommendations, and simulated trade log." />
+          <RoomLink href="/backtest" title="Backtest Lab" detail="Replay the manager signal against historical closes." />
         </section>
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t-4 border-black bg-white p-2 md:hidden" role="toolbar" aria-label="Quick trade controls">
         <div className="grid grid-cols-3 gap-2">
-          <button className="h-12 border-2 border-black bg-[#0c7c59] px-2 text-[11px] font-semibold text-white" onClick={() => void runAnalysis()}>
+          <PixelButton tone="magic" glow className="px-1 text-[10px]" onClick={() => void runAnalysis()}>
             Analyze
-          </button>
-          <button className="h-12 border-2 border-black bg-[#1b4332] px-2 text-[11px] font-semibold text-white" onClick={() => void placeTrade("BUY")}>
+          </PixelButton>
+          <PixelButton tone="good" className="px-1 text-[10px]" onClick={() => void placeTrade("BUY")}>
             Buy {tradeEstimate.qty}
-          </button>
-          <button className="h-12 border-2 border-black bg-[#2f4858] px-2 text-[11px] font-semibold text-white" onClick={() => void placeTrade("SELL")}>
+          </PixelButton>
+          <PixelButton tone="neutral" className="px-1 text-[10px]" onClick={() => void placeTrade("SELL")}>
             Sell {tradeEstimate.qty}
-          </button>
+          </PixelButton>
         </div>
       </div>
     </main>
@@ -1015,47 +758,15 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: "
   );
 }
 
-function HudChip({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
-  const toneClass = tone === "good" ? "text-emerald-950" : tone === "bad" ? "text-red-950" : "text-slate-950";
-  const bgClass = tone === "good" ? "bg-emerald-200" : tone === "bad" ? "bg-red-200" : "bg-[#f7fff7]";
+function RoomLink({ href, title, detail }: { href: string; title: string; detail: string }) {
   return (
-    <div className={`border-2 border-black px-2 py-1 ${bgClass}`}>
-      <p className="text-[9px] uppercase text-slate-600">{label}</p>
-      <p className={`truncate font-pixel text-[10px] ${toneClass}`}>{value}</p>
-    </div>
-  );
-}
-
-function DebateCard({
-  title,
-  result,
-  tone,
-  onSelect
-}: {
-  title: string;
-  result?: AnalysisRun["recommendations"][number];
-  tone: "good" | "bad" | "neutral";
-  onSelect: () => void;
-}) {
-  const toneClass =
-    tone === "good" ? "bg-emerald-100" : tone === "bad" ? "bg-red-100" : "bg-[#edf6f9]";
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`min-h-40 border-2 border-black p-3 text-left shadow-[3px_3px_0_#111] motion-safe:transition-transform motion-safe:active:scale-[0.99] ${toneClass}`}
+    <Link
+      href={href}
+      className="pixel-panel rounded-[6px] border-4 border-black bg-[#fffdf4] p-3 shadow-[5px_5px_0_#111] transition-transform hover:-translate-y-1 hover:bg-[#f7fff7] active:translate-x-1 active:translate-y-1 active:shadow-none"
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-bold uppercase">{title}</p>
-        <span className={badgeClass(result?.recommendation ?? result?.status ?? "PENDING")}>{result?.recommendation ?? result?.status ?? "PENDING"}</span>
-      </div>
-      <p className="mt-2 min-h-10 text-xs leading-5">{result?.summary ?? "Waiting for this agent to report."}</p>
-      <div className="mt-2 grid gap-1">
-        {(result?.reasons ?? []).slice(0, 2).map((reason, idx) => (
-          <EvidenceReason key={`${result?.id ?? title}-${idx}`} reason={reason} />
-        ))}
-      </div>
-    </button>
+      <p className="font-pixel text-[10px] leading-5 sm:text-xs">{title}</p>
+      <p className="mt-2 text-xs leading-5 text-slate-700">{detail}</p>
+    </Link>
   );
 }
 
@@ -1099,16 +810,4 @@ function formatMoney(value: number) {
 
 function formatSignedPercent(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
-}
-
-function displayNumber(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "N/A";
-}
-
-function displayPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? formatSignedPercent(value) : "N/A";
-}
-
-function displayMoney(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? formatMoney(value) : "N/A";
 }
