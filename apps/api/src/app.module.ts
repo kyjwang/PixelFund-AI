@@ -12,6 +12,7 @@ import { WsModule } from "./ws/ws.module";
 import { StartupService } from "./common/config/startup.service";
 import { WatchlistModule } from "./watchlist/watchlist.module";
 import { BacktestsModule } from "./backtests/backtests.module";
+import { HealthModule } from "./health/health.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { BacktestsModule } from "./backtests/backtests.module";
     MarketModule,
     BacktestsModule,
     WatchlistModule,
+    HealthModule,
     QuotesModule,
     WsModule
   ],

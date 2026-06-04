@@ -22,6 +22,7 @@
     "infra:down:volumes": "docker compose down -v",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma generate && prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed"
   },

@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: pixeltrade-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run db:generate && npm run build --workspace @pixelfund/api
+    startCommand: npm run start --workspace @pixelfund/api
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: AI_PROVIDER
+        value: nvidia
+      - key: NVIDIA_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+      - key: NVIDIA_MODEL
+        value: openai/gpt-oss-20b
+      - key: QUOTE_POLL_MS
+        value: "7000"
+      - key: QUOTE_STALE_MS
+        value: "20000"
+

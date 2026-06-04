@@ -16,8 +16,9 @@ async function bootstrap() {
   app.useGlobalInterceptors(new RequestLoggingInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  await app.listen(4000);
-  Logger.log("API listening on http://localhost:4000", "Bootstrap");
+  const port = Number(process.env.PORT ?? 4000);
+  await app.listen(port);
+  Logger.log(`API listening on port ${port}`, "Bootstrap");
 }
 
 bootstrap();

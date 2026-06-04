@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "npm run build && node dist/apps/api/src/main.js",
     "build": "nest build",
-    "start": "node dist/main.js",
+    "start": "node dist/apps/api/src/main.js",
     "test": "jest",
     "test:integration": "jest --config jest.integration.config.ts",
     "typecheck": "tsc --noEmit"
