@@ -69,7 +69,27 @@
 
 ### `GET /trades?limit={n}`
 - Purpose: recent virtual trade history
+- Header: optional `x-demo-user-id` isolates the account trade tape
 - Response: `{ data: Trade[] }`
+
+### `GET /watchlist`
+- Purpose: current simulation account watchlist
+- Header: optional `x-demo-user-id` isolates saved tickers
+- Response: `{ data: WatchlistItem[] }`
+
+### `POST /watchlist`
+- Purpose: add or reuse a ticker in the current simulation account watchlist
+- Header: optional `x-demo-user-id`
+- Request body:
+```json
+{ "ticker": "AAPL" }
+```
+- Response: `{ data: WatchlistItem }`
+
+### `DELETE /watchlist/:ticker`
+- Purpose: remove a ticker from the current simulation account watchlist
+- Header: optional `x-demo-user-id`
+- Response: `{ data: { "ticker": "AAPL" } }`
 
 ### `POST /analysis-runs`
 - Purpose: create/reuse analysis run

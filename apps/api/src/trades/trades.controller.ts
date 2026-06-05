@@ -19,7 +19,7 @@ export class TradesController {
   }
 
   @Get()
-  async listTrades(@Query("limit") limit?: string) {
-    return this.trades.listTrades(limit ? Number(limit) : undefined);
+  async listTrades(@Query("limit") limit?: string, @Headers("x-demo-user-id") ownerKey?: string) {
+    return this.trades.listTrades(limit ? Number(limit) : undefined, ownerKey);
   }
 }

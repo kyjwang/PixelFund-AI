@@ -12,7 +12,8 @@ import {
   providerCapabilitiesSchema,
   quoteSchema,
   stockHistorySchema,
-  tradeSchema
+  tradeSchema,
+  watchlistItemSchema
 } from "@pixelfund/schemas";
 
 describe("http integration", () => {
@@ -119,7 +120,7 @@ describe("http integration", () => {
   test("trade preview returns sizing and trigger status", async () => {
     const res = await request(server)
       .post("/trades/preview")
-      .send({ ticker: "AAPL", side: "BUY", quantity: 1, orderType: "LIMIT", limitPrice: 999999 })
+      .send({ ticker: "AAPL", side: "BUY", quantity: 1, orderType: "LIMIT", limitPrice: 999 })
       .expect(201);
 
     expect(res.body.data.executableNow).toBe(true);
@@ -172,5 +173,54 @@ describe("http integration", () => {
     const res = await request(server).get("/trades").expect(200);
     expect(() => tradeSchema.array().parse(res.body.data)).not.toThrow();
     expect(res.body.data[0].ticker).toBe("MSFT");
+  });
+
+  test("isolates watchlists by demo account header", async () => {
+    const accountA = "account-a";
+    const accountB = "account-b";
+
+    await request(server).post("/watchlist").set("x-demo-user-id", accountA).send({ ticker: "MSFT" }).expect(201);
+    await request(server).post("/watchlist").set("x-demo-user-id", accountA).send({ ticker: "MSFT" }).expect(201);
+    await request(server).post("/watchlist").set("x-demo-user-id", accountB).send({ ticker: "MSFT" }).expect(201);
+    await request(server).post("/watchlist").set("x-demo-user-id", accountB).send({ ticker: "AAPL" }).expect(201);
+
+    const listA = await request(server).get("/watchlist").set("x-demo-user-id", accountA).expect(200);
+    const listB = await request(server).get("/watchlist").set("x-demo-user-id", accountB).expect(200);
+    const parsedA = watchlistItemSchema.array().parse(listA.body.data);
+    const parsedB = watchlistItemSchema.array().parse(listB.body.data);
+
+    expect(parsedA.map((item) => item.ticker)).toEqual(["MSFT"]);
+    expect(parsedB.map((item) => item.ticker).sort()).toEqual(["AAPL", "MSFT"]);
+
+    await request(server).delete("/watchlist/MSFT").set("x-demo-user-id", accountA).expect(200);
+    const afterDeleteA = await request(server).get("/watchlist").set("x-demo-user-id", accountA).expect(200);
+    const afterDeleteB = await request(server).get("/watchlist").set("x-demo-user-id", accountB).expect(200);
+
+    expect(afterDeleteA.body.data).toEqual([]);
+    expect(afterDeleteB.body.data.map((item: any) => item.ticker).sort()).toEqual(["AAPL", "MSFT"]);
+  });
+
+  test("isolates portfolios and trade history by demo account header", async () => {
+    const accountA = "trade-account-a";
+    const accountB = "trade-account-b";
+
+    await request(server).post("/trades").set("x-demo-user-id", accountA).send({ ticker: "MSFT", side: "BUY", quantity: 1 }).expect(201);
+    await request(server).post("/trades").set("x-demo-user-id", accountB).send({ ticker: "AAPL", side: "BUY", quantity: 1 }).expect(201);
+
+    const portfolioA = await request(server).get("/portfolio").set("x-demo-user-id", accountA).expect(200);
+    const portfolioB = await request(server).get("/portfolio").set("x-demo-user-id", accountB).expect(200);
+    const parsedPortfolioA = portfolioSchema.parse(portfolioA.body.data);
+    const parsedPortfolioB = portfolioSchema.parse(portfolioB.body.data);
+
+    expect(parsedPortfolioA.positions.map((position) => position.ticker)).toEqual(["MSFT"]);
+    expect(parsedPortfolioB.positions.map((position) => position.ticker)).toEqual(["AAPL"]);
+
+    const tradesA = await request(server).get("/trades").set("x-demo-user-id", accountA).expect(200);
+    const tradesB = await request(server).get("/trades").set("x-demo-user-id", accountB).expect(200);
+    const parsedTradesA = tradeSchema.array().parse(tradesA.body.data);
+    const parsedTradesB = tradeSchema.array().parse(tradesB.body.data);
+
+    expect(parsedTradesA.map((trade) => trade.ticker)).toEqual(["MSFT"]);
+    expect(parsedTradesB.map((trade) => trade.ticker)).toEqual(["AAPL"]);
   });
 });

@@ -27,7 +27,7 @@ npm run dev
 ### Working now
 - Pixel office UI and mobile-responsive experience
 - Virtual buy/sell portfolio flow with market/limit/stop preview checks
-- Browser-isolated demo accounts via `x-demo-user-id`
+- Browser-isolated simulation accounts with scoped portfolio, watchlist, and trade history via `x-demo-user-id`
 - Full investment committee lifecycle with specialist, debate, risk council, team lead, and manager outputs
 - Realtime websocket quote and lifecycle events
 - Trade sizing hints, richer P&L analytics, and recommendation explainability

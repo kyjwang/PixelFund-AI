@@ -89,8 +89,11 @@ model Trade {
 
 model WatchlistItem {
   id        String   @id @default(cuid())
-  ticker    String   @unique
+  ownerKey  String   @default("demo")
+  ticker    String
   createdAt DateTime @default(now())
+
+  @@unique([ownerKey, ticker])
 }
 
 model AnalysisRun {

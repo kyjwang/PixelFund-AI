@@ -101,7 +101,7 @@ export default function HistoryPage() {
           </div>
         </PixelCard>
 
-        <PixelCard title="Trade History" eyebrow="fake order tape">
+        <PixelCard title="Trade History" eyebrow="virtual order tape">
           <div className="max-h-[420px] overflow-auto border-2 border-black">
             {trades.map((trade) => (
               <div key={trade.id} className="grid grid-cols-[52px_58px_1fr] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
@@ -121,4 +121,3 @@ export default function HistoryPage() {
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 }
-

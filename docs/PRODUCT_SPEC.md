@@ -34,7 +34,7 @@
 
 ## Constraints
 - Educational simulation only; not financial advice.
-- Browser-isolated demo accounts, not production auth.
+- Browser-isolated simulation accounts for portfolio, watchlist, and trade history; not production auth.
 - Market data provider abstraction must support future provider swap.
 - Limit/stop orders are trigger-checked immediate simulations, not durable pending orders.
 

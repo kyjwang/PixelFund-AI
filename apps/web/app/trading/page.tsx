@@ -344,7 +344,7 @@ export default function TradingPage() {
             </PixelButton>
           </PixelCard>
 
-          <PixelCard title="Recent Trades" eyebrow="fake order tape">
+          <PixelCard title="Recent Trades" eyebrow="virtual order tape">
             <div className="max-h-72 overflow-auto border-2 border-black">
               {trades.map((trade) => (
                 <div key={trade.id} className="grid grid-cols-[52px_58px_1fr] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">

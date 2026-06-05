@@ -132,9 +132,11 @@ export class TradesService {
     return portfolio;
   }
 
-  async listTrades(limit = 25) {
+  async listTrades(limit = 25, ownerKey?: string) {
+    const account = await this.portfolio.getOrCreateAccount(ownerKey);
     const safeLimit = Number.isFinite(limit) ? limit : 25;
     return this.prisma.trade.findMany({
+      where: { accountId: account.id },
       orderBy: { createdAt: "desc" },
       take: Math.min(Math.max(safeLimit, 1), 100)
     });

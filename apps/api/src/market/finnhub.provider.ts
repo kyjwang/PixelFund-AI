@@ -14,7 +14,7 @@ export class FinnhubProvider implements MarketDataProvider {
     supportsAnalystTrend: true,
     supportsHistory: true
   };
-  private key = process.env.FINNHUB_API_KEY;
+  private key = configured(process.env.FINNHUB_API_KEY) ? process.env.FINNHUB_API_KEY : undefined;
 
   async search(symbol: string) {
     const normalized = symbol.trim().toUpperCase();
@@ -185,6 +185,10 @@ export class FinnhubProvider implements MarketDataProvider {
       source: "finnhub"
     }));
   }
+}
+
+function configured(value: string | undefined) {
+  return Boolean(value && value.trim() && !value.startsWith("your_"));
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {

@@ -13,8 +13,8 @@ async function main() {
   const watchlist = ["AAPL", "MSFT", "NVDA", "TSLA"];
   for (const ticker of watchlist) {
     await prisma.watchlistItem.upsert({
-      where: { ticker },
-      create: { ticker },
+      where: { ownerKey_ticker: { ownerKey: account.ownerKey, ticker } },
+      create: { ownerKey: account.ownerKey, ticker },
       update: {}
     });
   }
