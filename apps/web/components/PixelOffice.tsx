@@ -18,6 +18,9 @@ export type GameAgent = {
   skin: string;
   hair: string;
   prop:
+    | "chart"
+    | "ledger"
+    | "newspaper"
     | "glasses"
     | "book"
     | "paper"
@@ -33,7 +36,8 @@ export type GameAgent = {
     | "ticket"
     | "flame"
     | "balance"
-    | "lock";
+    | "lock"
+    | "whiteboard";
 };
 
 const visualAgents: GameAgent[] = [
@@ -46,13 +50,13 @@ const visualAgents: GameAgent[] = [
     signal: "Momentum watch",
     confidence: 72,
     mockAnalysis: "Price action is holding above the short moving average while volume is stable. I want confirmation before calling it a clean breakout.",
-    x: "9%",
-    y: "72%",
+    x: "10%",
+    y: "28%",
     outfit: "#2563eb",
     accent: "#93c5fd",
     skin: "#f2c7a4",
     hair: "#1e293b",
-    prop: "glasses"
+    prop: "chart"
   },
   {
     id: "FUNDAMENTALS_ANALYST",
@@ -64,12 +68,12 @@ const visualAgents: GameAgent[] = [
     confidence: 68,
     mockAnalysis: "Margins and growth quality look constructive, but valuation needs to be compared against forward earnings before sizing up.",
     x: "23%",
-    y: "76%",
+    y: "28%",
     outfit: "#ca8a04",
     accent: "#fde68a",
     skin: "#c98b61",
     hair: "#3f2a1d",
-    prop: "book"
+    prop: "ledger"
   },
   {
     id: "NEWS_ANALYST",
@@ -80,13 +84,13 @@ const visualAgents: GameAgent[] = [
     signal: "Headline scan",
     confidence: 64,
     mockAnalysis: "Recent headlines are mixed but not alarming. I am watching for management commentary or sector news that changes the tone.",
-    x: "37%",
-    y: "72%",
+    x: "36%",
+    y: "28%",
     outfit: "#059669",
     accent: "#a7f3d0",
     skin: "#d9a476",
     hair: "#111827",
-    prop: "paper"
+    prop: "newspaper"
   },
   {
     id: "RISK_ANALYST",
@@ -97,8 +101,8 @@ const visualAgents: GameAgent[] = [
     signal: "Risk cap",
     confidence: 75,
     mockAnalysis: "Downside risk is acceptable only with controlled sizing. If volatility expands, this trade should be reduced quickly.",
-    x: "51%",
-    y: "76%",
+    x: "56%",
+    y: "68%",
     outfit: "#dc2626",
     accent: "#fecaca",
     skin: "#8d5524",
@@ -114,8 +118,8 @@ const visualAgents: GameAgent[] = [
     signal: "Position review",
     confidence: 70,
     mockAnalysis: "The trade can fit the portfolio if exposure remains measured. I am waiting for the team meeting before final approval.",
-    x: "79%",
-    y: "72%",
+    x: "88%",
+    y: "85%",
     outfit: "#7c3aed",
     accent: "#ddd6fe",
     skin: "#f0b98d",
@@ -131,8 +135,8 @@ const visualAgents: GameAgent[] = [
     signal: "Rates watch",
     confidence: 61,
     mockAnalysis: "Macro backdrop is not hostile, but rates and dollar strength could pressure high-multiple names if risk appetite fades.",
-    x: "8%",
-    y: "22%",
+    x: "49%",
+    y: "28%",
     outfit: "#0f766e",
     accent: "#99f6e4",
     skin: "#b77952",
@@ -148,8 +152,8 @@ const visualAgents: GameAgent[] = [
     signal: "Crowd pulse",
     confidence: 66,
     mockAnalysis: "Crowd tone is leaning optimistic, but not euphoric. That supports a watchful bullish stance rather than chasing.",
-    x: "20%",
-    y: "22%",
+    x: "62%",
+    y: "28%",
     outfit: "#db2777",
     accent: "#fbcfe8",
     skin: "#e0ac69",
@@ -165,8 +169,8 @@ const visualAgents: GameAgent[] = [
     signal: "Factor model",
     confidence: 69,
     mockAnalysis: "The factor blend is slightly positive. Momentum contributes most, while volatility prevents a stronger score.",
-    x: "32%",
-    y: "22%",
+    x: "75%",
+    y: "28%",
     outfit: "#111827",
     accent: "#22c55e",
     skin: "#ddb892",
@@ -182,8 +186,8 @@ const visualAgents: GameAgent[] = [
     signal: "Liquidity read",
     confidence: 58,
     mockAnalysis: "Crypto beta is quiet but can still spill into risk assets. I would not use crypto strength alone as confirmation here.",
-    x: "44%",
-    y: "22%",
+    x: "88%",
+    y: "28%",
     outfit: "#f97316",
     accent: "#fed7aa",
     skin: "#c68642",
@@ -199,13 +203,13 @@ const visualAgents: GameAgent[] = [
     signal: "Final summary",
     confidence: 73,
     mockAnalysis: "I am collecting each desk's strongest point, then I will turn the meeting into one clean trade summary.",
-    x: "91%",
-    y: "72%",
+    x: "74%",
+    y: "85%",
     outfit: "#475569",
     accent: "#e2e8f0",
     skin: "#f2c7a4",
     hair: "#78350f",
-    prop: "badge"
+    prop: "whiteboard"
   },
   {
     id: "BULL_RESEARCHER",
@@ -216,8 +220,8 @@ const visualAgents: GameAgent[] = [
     signal: "Bull thesis",
     confidence: 71,
     mockAnalysis: "The upside case is forming around momentum, improving evidence quality, and specialist agreement. I want the team to focus on what can go right.",
-    x: "56%",
-    y: "22%",
+    x: "34%",
+    y: "48%",
     outfit: "#16a34a",
     accent: "#bbf7d0",
     skin: "#e0ac69",
@@ -233,8 +237,8 @@ const visualAgents: GameAgent[] = [
     signal: "Bear thesis",
     confidence: 69,
     mockAnalysis: "The downside case centers on valuation, missing data, and whether the setup already prices in too much optimism.",
-    x: "68%",
-    y: "22%",
+    x: "48%",
+    y: "48%",
     outfit: "#991b1b",
     accent: "#fecaca",
     skin: "#c68642",
@@ -250,8 +254,8 @@ const visualAgents: GameAgent[] = [
     signal: "Trade plan",
     confidence: 67,
     mockAnalysis: "I translate the debate into an entry, size, invalidation level, and holding window. A good thesis still needs a clean trade plan.",
-    x: "80%",
-    y: "22%",
+    x: "18%",
+    y: "68%",
     outfit: "#0f766e",
     accent: "#99f6e4",
     skin: "#f0b98d",
@@ -267,8 +271,8 @@ const visualAgents: GameAgent[] = [
     signal: "Upside risk",
     confidence: 63,
     mockAnalysis: "I will accept volatility when the reward profile is strong, but I still want a clear stop and a reason for urgency.",
-    x: "58%",
-    y: "49%",
+    x: "43%",
+    y: "68%",
     outfit: "#f97316",
     accent: "#fed7aa",
     skin: "#b77952",
@@ -284,8 +288,8 @@ const visualAgents: GameAgent[] = [
     signal: "Risk balance",
     confidence: 66,
     mockAnalysis: "The trade needs balanced sizing. I am checking whether the expected reward is enough for the uncertainty in the evidence.",
-    x: "72%",
-    y: "49%",
+    x: "69%",
+    y: "68%",
     outfit: "#64748b",
     accent: "#e2e8f0",
     skin: "#d9a476",
@@ -301,14 +305,33 @@ const visualAgents: GameAgent[] = [
     signal: "Capital guard",
     confidence: 74,
     mockAnalysis: "I need proof before approving size. If the data is partial or volatility is elevated, the safest trade may be no trade.",
-    x: "86%",
-    y: "49%",
+    x: "82%",
+    y: "68%",
     outfit: "#7f1d1d",
     accent: "#fecaca",
     skin: "#8d5524",
     hair: "#1f2937",
     prop: "lock"
   }
+];
+
+const officeWorkflowOrder = [
+  "TECHNICAL_ANALYST",
+  "FUNDAMENTALS_ANALYST",
+  "NEWS_ANALYST",
+  "MACRO_ANALYST",
+  "SENTIMENT_ANALYST",
+  "QUANT_ANALYST",
+  "CRYPTO_SPECIALIST",
+  "BULL_RESEARCHER",
+  "BEAR_RESEARCHER",
+  "TRADER_AGENT",
+  "AGGRESSIVE_RISK",
+  "RISK_ANALYST",
+  "NEUTRAL_RISK",
+  "CONSERVATIVE_RISK",
+  "TEAM_LEAD",
+  "PORTFOLIO_MANAGER"
 ];
 
 export const gameAgents: GameAgent[] = AGENT_PROFILES.map((profile) => {
@@ -319,7 +342,7 @@ export const gameAgents: GameAgent[] = AGENT_PROFILES.map((profile) => {
     label: profile.label,
     role: profile.role
   };
-});
+}).sort((a, b) => officeWorkflowOrder.indexOf(a.id) - officeWorkflowOrder.indexOf(b.id));
 
 const recommendationColor: Record<string, string> = {
   BUY: "bg-emerald-300 text-slate-950",
@@ -345,6 +368,9 @@ function stateClass(state: string, active: boolean) {
 
 function propPixels(agent: GameAgent) {
   const common = "absolute border border-black";
+  if (agent.prop === "chart") return <span className={`${common} right-[5px] top-[30px] h-7 w-7 bg-[#dbeafe] shadow-[inset_4px_-4px_0_#2563eb,inset_10px_-10px_0_#22c55e]`} />;
+  if (agent.prop === "ledger") return <span className={`${common} right-[8px] top-[32px] h-6 w-5 bg-[#fef3c7] shadow-[inset_0_4px_0_#92400e,inset_0_9px_0_#fde68a]`} />;
+  if (agent.prop === "newspaper") return <span className={`${common} right-[5px] top-[34px] h-5 w-8 bg-white shadow-[inset_0_4px_0_#cbd5e1,inset_10px_0_0_#e2e8f0]`} />;
   if (agent.prop === "glasses") return <><span className={`${common} left-[18px] top-[20px] h-2 w-3 bg-[#bfdbfe]`} /><span className={`${common} left-[31px] top-[20px] h-2 w-3 bg-[#bfdbfe]`} /></>;
   if (agent.prop === "book") return <span className={`${common} right-[8px] top-[37px] h-5 w-4 bg-[#fef3c7]`} />;
   if (agent.prop === "paper") return <span className={`${common} right-[8px] top-[35px] h-5 w-5 bg-white`} />;
@@ -360,6 +386,7 @@ function propPixels(agent: GameAgent) {
   if (agent.prop === "flame") return <span className={`${common} right-[9px] top-[31px] h-7 w-5 bg-[#fb923c] shadow-[inset_4px_4px_0_#facc15]`} />;
   if (agent.prop === "balance") return <span className={`${common} right-[6px] top-[33px] h-5 w-7 bg-[#cbd5e1] before:absolute before:left-[12px] before:top-[-7px] before:h-7 before:w-1 before:bg-black after:absolute after:left-[4px] after:top-[6px] after:h-1 after:w-5 after:bg-black`} />;
   if (agent.prop === "lock") return <span className={`${common} right-[8px] top-[36px] h-5 w-6 bg-[#eab308] before:absolute before:left-[5px] before:top-[-8px] before:h-4 before:w-4 before:border-2 before:border-black`} />;
+  if (agent.prop === "whiteboard") return <span className={`${common} right-[4px] top-[29px] h-7 w-8 bg-white shadow-[inset_0_-5px_0_#cbd5e1,inset_5px_5px_0_#bfdbfe]`} />;
   return <span className={`${common} right-[8px] top-[31px] h-6 w-5 bg-[#cbd5e1]`} />;
 }
 
@@ -404,18 +431,51 @@ export function PixelOffice({
       <div className="absolute bottom-0 h-52 w-full bg-[#5a3e34]" />
       <div className="absolute bottom-44 left-0 right-0 h-5 bg-[#2f4858]" />
       <div className="absolute bottom-12 left-[8%] h-10 w-[84%] border-4 border-black bg-[#3d2b24] shadow-[6px_6px_0_#111]" />
-      <div className="absolute left-2 top-[15%] z-20 max-w-[88px] border-2 border-black bg-white px-1.5 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#111] sm:left-3 sm:max-w-none sm:px-2 sm:text-[8px]">macro + crowd</div>
-      <div className="absolute left-[53%] top-[15%] z-20 border-2 border-black bg-white px-2 py-1 font-pixel text-[8px] shadow-[2px_2px_0_#111]">debate desk</div>
-      <div className="absolute right-2 top-[42%] z-20 max-w-[80px] border-2 border-black bg-white px-1.5 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#111] sm:right-3 sm:max-w-none sm:px-2 sm:text-[8px]">risk council</div>
-      <div className="absolute left-2 bottom-[31%] z-20 max-w-[84px] border-2 border-black bg-white px-1.5 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#111] sm:left-3 sm:max-w-none sm:px-2 sm:text-[8px]">analyst floor</div>
-      <div className="absolute left-[5%] top-[19%] h-16 w-[24%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
-      <div className="absolute left-[38%] top-[17%] h-16 w-[24%] border-4 border-slate-950 bg-[#0f172a] shadow-[4px_4px_0_#111]" />
-      <div className="absolute right-[5%] top-[19%] h-16 w-[24%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
-      <div className="absolute left-[11%] top-[22%] h-2 w-[12%] bg-[#2563eb]" />
-      <div className="absolute left-[43%] top-[20%] h-2 w-[3%] bg-[#22c55e]" />
-      <div className="absolute left-[48%] top-[23%] h-2 w-[3%] bg-[#22c55e]" />
-      <div className="absolute left-[53%] top-[26%] h-2 w-[3%] bg-[#22c55e]" />
-      <div className="absolute right-[11%] top-[23%] h-2 w-[12%] bg-[#dc2626]" />
+
+      <div className="absolute left-[4%] top-[15%] z-20 border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#111] sm:text-[8px]">evidence desks</div>
+      <div className="absolute left-[32%] top-[39%] z-20 border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#111] sm:text-[8px]">bull vs bear</div>
+      <div className="absolute left-[9%] top-[59%] z-20 border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#111] sm:text-[8px]">execution + risk</div>
+      <div className="absolute right-[4%] bottom-[22%] z-20 border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#111] sm:text-[8px]">leadership</div>
+
+      <div className="absolute left-[4%] top-[19%] h-14 w-[90%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
+      <div className="absolute left-[8%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#dbeafe]" />
+      <div className="absolute left-[22%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#fef3c7]" />
+      <div className="absolute left-[36%] top-[21%] h-7 w-[12%] border-2 border-black bg-white" />
+      <div className="absolute left-[50%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#bae6fd]" />
+      <div className="absolute left-[64%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#fbcfe8]" />
+      <div className="absolute left-[78%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#052e16] shadow-[inset_0_0_0_4px_#22c55e]" />
+
+      <div className="absolute left-[30%] top-[42%] h-14 w-[24%] border-4 border-slate-950 bg-[#0f172a] shadow-[4px_4px_0_#111]" />
+      <div className="absolute left-[36%] top-[43%] h-2 w-[4%] bg-[#22c55e]" />
+      <div className="absolute left-[42%] top-[46%] h-2 w-[4%] bg-[#ef4444]" />
+      <div className="absolute left-[46%] top-[43%] h-2 w-[4%] bg-[#facc15]" />
+
+      <div className="absolute left-[10%] top-[63%] h-14 w-[78%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
+      <div className="absolute left-[15%] top-[64%] h-8 w-10 border-2 border-black bg-[#fef3c7] shadow-[inset_0_-6px_0_#14b8a6]" />
+      <div className="absolute left-[41%] top-[64%] h-8 w-10 border-2 border-black bg-[#fed7aa]" />
+      <div className="absolute left-[55%] top-[64%] h-8 w-10 border-2 border-black bg-[#fecaca]" />
+      <div className="absolute left-[69%] top-[64%] h-8 w-10 border-2 border-black bg-[#e2e8f0]" />
+      <div className="absolute left-[82%] top-[64%] h-8 w-10 border-2 border-black bg-[#fef08a]" />
+
+      <div className="absolute right-[6%] bottom-[13%] h-20 w-[24%] border-4 border-slate-950 bg-[#fff8e7] shadow-[4px_4px_0_#111]" />
+      <div className="absolute right-[10%] bottom-[22%] h-8 w-[15%] border-2 border-black bg-white shadow-[inset_0_-6px_0_#cbd5e1]" />
+      <div className="absolute left-[4%] bottom-[18%] h-20 w-12 border-4 border-black bg-[#8b5e34] shadow-[3px_3px_0_#111]">
+        <span className="absolute left-1 top-2 h-3 w-8 border border-black bg-[#fef3c7]" />
+        <span className="absolute left-1 top-7 h-3 w-8 border border-black bg-[#fef3c7]" />
+        <span className="absolute left-1 top-12 h-3 w-8 border border-black bg-[#fef3c7]" />
+      </div>
+      <div className="absolute right-[3%] top-[35%] h-16 w-10 border-4 border-black bg-[#0c7c59] shadow-[3px_3px_0_#111]">
+        <span className="absolute left-3 top-[-18px] h-6 w-4 border-2 border-black bg-[#16a34a]" />
+        <span className="absolute left-1 top-2 h-2 w-7 border border-black bg-[#bbf7d0]" />
+      </div>
+      <div className="absolute left-[5%] top-[38%] h-12 w-16 border-4 border-black bg-[#7c3aed] shadow-[3px_3px_0_#111]">
+        <span className="absolute left-2 top-2 h-2 w-10 bg-[#facc15]" />
+        <span className="absolute left-2 top-6 h-2 w-7 bg-[#22c55e]" />
+      </div>
+      <div className="absolute left-[13%] bottom-[12%] h-10 w-12 border-4 border-black bg-[#fff8e7] shadow-[3px_3px_0_#111]">
+        <span className="absolute left-3 top-[-10px] h-3 w-6 border-2 border-black bg-white" />
+        <span className="absolute left-5 top-2 h-4 w-3 bg-[#6b3f2a]" />
+      </div>
       <div className="absolute inset-x-0 top-3 flex justify-center px-2">
         <p className="max-w-full truncate border-2 border-black bg-white px-2 py-1 font-pixel text-[10px] text-slate-900 sm:text-xs">
           {selected.role}: {selectedStatus}

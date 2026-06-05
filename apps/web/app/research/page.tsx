@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 import {
   analysisExplanationSchema,
@@ -34,7 +35,8 @@ const meetingSteps = [
 ];
 
 export default function ResearchPage() {
-  const [ticker, setTicker] = useState("AAPL");
+  const searchParams = useSearchParams();
+  const [ticker, setTicker] = useState(searchParams.get("ticker")?.toUpperCase() ?? "AAPL");
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
   const [explanation, setExplanation] = useState<AnalysisExplanation | null>(null);
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
@@ -310,4 +312,3 @@ function displayPercent(value: number | null | undefined) {
 function displayMoney(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? formatMoney(value) : "N/A";
 }
-

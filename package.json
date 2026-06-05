@@ -30,6 +30,7 @@
     "seed": "ts-node --project tsconfig.base.json prisma/seed.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/node": "^22.7.5",
     "prisma": "^5.16.2",
     "ts-node": "^10.9.2",

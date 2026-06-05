@@ -9,9 +9,11 @@ import { PixelButton } from "./GameUI";
 
 const navItems = [
   { href: "/", label: "Desk" },
+  { href: "/trading", label: "Trading" },
   { href: "/research", label: "Research" },
   { href: "/history", label: "History" },
-  { href: "/backtest", label: "Backtest" }
+  { href: "/backtest", label: "Backtest" },
+  { href: "/profile", label: "Profile" }
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -56,7 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             PixelTrade AI
           </Link>
 
-          <nav className="order-3 grid w-full grid-cols-4 gap-1 sm:order-none sm:w-auto sm:flex" aria-label="Game rooms">
+          <nav className="order-3 grid w-full grid-cols-3 gap-1 sm:order-none sm:w-auto sm:flex" aria-label="Game rooms">
             {navItems.map((item) => {
               const active = pathname === item.href;
               return (
@@ -93,4 +95,3 @@ export function AppShell({ children }: { children: ReactNode }) {
     </div>
   );
 }
-

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { backtestResultSchema } from "@pixelfund/schemas";
 import { PixelButton, PixelCard, StatTile } from "../../components/GameUI";
@@ -9,7 +10,8 @@ import { api } from "../../lib/api";
 type BacktestResult = z.infer<typeof backtestResultSchema>;
 
 export default function BacktestPage() {
-  const [ticker, setTicker] = useState("AAPL");
+  const searchParams = useSearchParams();
+  const [ticker, setTicker] = useState(searchParams.get("ticker")?.toUpperCase() ?? "AAPL");
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,4 +84,3 @@ export default function BacktestPage() {
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 }
-
