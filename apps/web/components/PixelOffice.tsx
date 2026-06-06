@@ -392,15 +392,23 @@ function propPixels(agent: GameAgent) {
 
 function PixelAvatar({ agent, thinking }: { agent: GameAgent; thinking: boolean }) {
   return (
-    <div className={`relative mx-auto h-[66px] w-[58px] ${thinking ? "motion-safe:animate-bounce" : "motion-safe:animate-[pixel-idle_2.8s_ease-in-out_infinite]"}`} style={{ imageRendering: "pixelated" }}>
-      <span className="absolute left-[18px] top-0 h-3 w-6 border-2 border-black" style={{ backgroundColor: agent.hair }} />
-      <span className="absolute left-[14px] top-[10px] h-8 w-8 border-2 border-black" style={{ backgroundColor: agent.skin }} />
-      <span className="absolute left-[18px] top-[14px] h-1.5 w-2 bg-black" />
-      <span className="absolute left-[32px] top-[14px] h-1.5 w-2 bg-black" />
-      <span className="absolute left-[24px] top-[25px] h-1.5 w-8 bg-[#7f1d1d]" />
-      <span className="absolute left-[12px] top-[38px] h-20 max-h-6 w-10 border-2 border-black" style={{ backgroundColor: agent.outfit }} />
-      <span className="absolute left-[18px] top-[42px] h-3 w-6 border border-black" style={{ backgroundColor: agent.accent }} />
-      <span className="absolute left-[6px] top-[41px] h-4 w-6 border-2 border-black" style={{ backgroundColor: agent.outfit }} />
+    <div className={`relative mx-auto h-[76px] w-[64px] ${thinking ? "motion-safe:animate-bounce" : "motion-safe:animate-[pixel-idle_2.8s_ease-in-out_infinite]"}`} style={{ imageRendering: "pixelated" }}>
+      <span className="absolute left-[14px] top-[7px] h-8 w-9 border-2 border-black" style={{ backgroundColor: agent.skin }} />
+      <span className="absolute left-[12px] top-[1px] h-4 w-11 border-2 border-black" style={{ backgroundColor: agent.hair }} />
+      <span className="absolute left-[16px] top-[5px] h-3 w-7 border-l-2 border-black" style={{ backgroundColor: agent.hair }} />
+      <span className="absolute left-[10px] top-[16px] h-3 w-3 border-2 border-black" style={{ backgroundColor: agent.skin }} />
+      <span className="absolute left-[52px] top-[16px] h-3 w-3 border-2 border-black" style={{ backgroundColor: agent.skin }} />
+      <span className="absolute left-[20px] top-[16px] h-1.5 w-2 bg-black" />
+      <span className="absolute left-[39px] top-[16px] h-1.5 w-2 bg-black" />
+      <span className="absolute left-[31px] top-[20px] h-2 w-2 border border-black bg-[#d9a476]" />
+      <span className="absolute left-[25px] top-[28px] h-1.5 w-[18px] bg-[#7f1d1d]" />
+      <span className="absolute left-[13px] top-[36px] h-7 w-11 border-2 border-black" style={{ backgroundColor: agent.outfit }} />
+      <span className="absolute left-[20px] top-[40px] h-4 w-7 border border-black" style={{ backgroundColor: agent.accent }} />
+      <span className="absolute left-[5px] top-[39px] h-5 w-7 border-2 border-black" style={{ backgroundColor: agent.outfit }} />
+      <span className="absolute right-[4px] top-[39px] h-5 w-7 border-2 border-black" style={{ backgroundColor: agent.outfit }} />
+      <span className="absolute left-[19px] bottom-[4px] h-5 w-3 border-2 border-black bg-[#1f2937]" />
+      <span className="absolute left-[39px] bottom-[4px] h-5 w-3 border-2 border-black bg-[#1f2937]" />
+      <span className="absolute left-[14px] bottom-0 h-2 w-10 border-2 border-black bg-black" />
       {propPixels(agent)}
     </div>
   );
@@ -428,7 +436,23 @@ export function PixelOffice({
       <div className="absolute inset-x-0 top-0 h-28 bg-[#8bd3dd]" />
       <div className="absolute inset-x-0 top-28 h-24 bg-[#f4d06f]" />
       <div className="absolute inset-x-0 top-0 h-full bg-[linear-gradient(90deg,rgba(15,23,42,0.08)_1px,transparent_1px),linear-gradient(rgba(15,23,42,0.08)_1px,transparent_1px)] bg-[length:24px_24px]" />
+      <div className="absolute left-[8%] top-8 h-20 w-[22%] border-4 border-black bg-[#dbeafe] shadow-[4px_4px_0_#111]">
+        <span className="absolute left-2 top-2 h-8 w-[35%] border-2 border-black bg-[#f7fff7]" />
+        <span className="absolute right-2 top-2 h-8 w-[35%] border-2 border-black bg-[#fef3c7]" />
+        <span className="absolute bottom-2 left-2 h-3 w-[70%] border border-black bg-[#38bdf8]" />
+      </div>
+      <div className="absolute left-[40%] top-8 h-20 w-[22%] border-4 border-black bg-[#e0f2fe] shadow-[4px_4px_0_#111]">
+        <span className="absolute left-3 top-3 h-4 w-4 border-2 border-black bg-[#22c55e]" />
+        <span className="absolute left-10 top-3 h-4 w-4 border-2 border-black bg-[#facc15]" />
+        <span className="absolute left-3 top-10 h-4 w-16 border-2 border-black bg-white" />
+      </div>
+      <div className="absolute right-[7%] top-8 h-20 w-[22%] border-4 border-black bg-[#fff8e7] shadow-[4px_4px_0_#111]">
+        <span className="absolute left-3 top-3 h-4 w-[68%] border-2 border-black bg-[#ef4444]" />
+        <span className="absolute left-3 top-9 h-4 w-[48%] border-2 border-black bg-[#22c55e]" />
+        <span className="absolute left-3 top-[3.7rem] h-2 w-[76%] bg-black" />
+      </div>
       <div className="absolute bottom-0 h-52 w-full bg-[#5a3e34]" />
+      <div className="absolute bottom-0 h-52 w-full bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[length:32px_28px]" />
       <div className="absolute bottom-44 left-0 right-0 h-5 bg-[#2f4858]" />
       <div className="absolute bottom-12 left-[8%] h-10 w-[84%] border-4 border-black bg-[#3d2b24] shadow-[6px_6px_0_#111]" />
 
@@ -437,7 +461,7 @@ export function PixelOffice({
       <div className="absolute left-[9%] top-[59%] z-20 border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#111] sm:text-[8px]">execution + risk</div>
       <div className="absolute right-[4%] bottom-[22%] z-20 border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#111] sm:text-[8px]">leadership</div>
 
-      <div className="absolute left-[4%] top-[19%] h-14 w-[90%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
+      <div className="absolute left-[4%] top-[19%] h-16 w-[90%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
       <div className="absolute left-[8%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#dbeafe]" />
       <div className="absolute left-[22%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#fef3c7]" />
       <div className="absolute left-[36%] top-[21%] h-7 w-[12%] border-2 border-black bg-white" />
@@ -445,12 +469,12 @@ export function PixelOffice({
       <div className="absolute left-[64%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#fbcfe8]" />
       <div className="absolute left-[78%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#052e16] shadow-[inset_0_0_0_4px_#22c55e]" />
 
-      <div className="absolute left-[30%] top-[42%] h-14 w-[24%] border-4 border-slate-950 bg-[#0f172a] shadow-[4px_4px_0_#111]" />
+      <div className="absolute left-[30%] top-[42%] h-16 w-[24%] border-4 border-slate-950 bg-[#0f172a] shadow-[4px_4px_0_#111]" />
       <div className="absolute left-[36%] top-[43%] h-2 w-[4%] bg-[#22c55e]" />
       <div className="absolute left-[42%] top-[46%] h-2 w-[4%] bg-[#ef4444]" />
       <div className="absolute left-[46%] top-[43%] h-2 w-[4%] bg-[#facc15]" />
 
-      <div className="absolute left-[10%] top-[63%] h-14 w-[78%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
+      <div className="absolute left-[10%] top-[63%] h-16 w-[78%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
       <div className="absolute left-[15%] top-[64%] h-8 w-10 border-2 border-black bg-[#fef3c7] shadow-[inset_0_-6px_0_#14b8a6]" />
       <div className="absolute left-[41%] top-[64%] h-8 w-10 border-2 border-black bg-[#fed7aa]" />
       <div className="absolute left-[55%] top-[64%] h-8 w-10 border-2 border-black bg-[#fecaca]" />
@@ -492,7 +516,7 @@ export function PixelOffice({
           <button
             key={agent.id}
             onClick={() => onSelect(agent.id)}
-            className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-none border-4 border-black font-pixel text-[7px] leading-none shadow-[4px_4px_0_#111] motion-safe:transition-all hover:brightness-105 hover:shadow-[5px_5px_0_#111] motion-safe:active:scale-95 sm:text-[8px] ${stateClass(state, active)} h-[98px] w-[68px] sm:h-[104px] sm:w-[74px]`}
+            className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-none border-4 border-black font-pixel text-[7px] leading-none shadow-[4px_4px_0_#111] motion-safe:transition-all hover:brightness-105 hover:shadow-[5px_5px_0_#111] motion-safe:active:scale-95 sm:text-[8px] ${stateClass(state, active)} h-[116px] w-[76px] sm:h-[122px] sm:w-[82px]`}
             style={{ left: agent.x, top: agent.y }}
             title={`${agent.role} (${agentStatus})`}
             aria-label={agent.role}

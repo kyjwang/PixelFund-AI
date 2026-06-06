@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { clearDemoUser, getDemoUser, type DemoUser } from "../lib/auth";
 import { PixelButton } from "./GameUI";
 
@@ -32,11 +32,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (nextUser && isLogin) router.replace("/");
   }, [isLogin, router]);
 
-  const activeLabel = useMemo(
-    () => navItems.find((item) => item.href === pathname)?.label ?? "Desk",
-    [pathname]
-  );
-
   if (!ready) {
     return (
       <main className="grid min-h-screen place-items-center px-4 text-slate-950">
@@ -55,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 border-b-4 border-black bg-[#fff8e7]/95 px-3 py-2 backdrop-blur sm:px-4">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
           <Link href="/" className="font-pixel text-xs leading-6 text-slate-950">
-            PixelTrade AI
+            PixelFund AI
           </Link>
 
           <nav className="order-3 grid w-full grid-cols-3 gap-1 sm:order-none sm:w-auto sm:flex" aria-label="Game rooms">
@@ -76,8 +71,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-2">
-            <span className="hidden border-2 border-black bg-[#f7fff7] px-2 py-1 text-[10px] font-bold uppercase sm:inline-flex">
-              {activeLabel}: {user.name}
+            <span className="hidden max-w-[180px] truncate border-2 border-black bg-[#f7fff7] px-3 py-1 font-pixel text-[10px] text-slate-950 shadow-[2px_2px_0_#111] sm:inline-flex">
+              {user.name}
             </span>
             <PixelButton
               className="min-h-8 px-2 py-1 text-[10px]"
