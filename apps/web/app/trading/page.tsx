@@ -1,26 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { io, Socket } from "socket.io-client";
 import { z } from "zod";
 import {
   analysisExplanationSchema,
   analysisRunSchema,
   marketContextSchema,
+  orderPreviewSchema,
+  orderSchema,
   portfolioSchema,
-  tradePreviewSchema,
-  tradeSchema
+  stockHistorySchema,
+  tradeSchema,
+  watchlistItemSchema
 } from "@pixelfund/schemas";
 import { PixelButton, PixelCard, StatTile, StatusBadge } from "../../components/GameUI";
 import { api } from "../../lib/api";
+
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
+const stockSearchSchema = z.array(z.object({ symbol: z.string(), description: z.string() }));
+const orderStatusFilterSchema = z.enum(["PENDING", "PARTIALLY_FILLED", "FILLED", "CANCELED", "REJECTED", "EXPIRED"]);
 
 type Portfolio = z.infer<typeof portfolioSchema>;
 type AnalysisRun = z.infer<typeof analysisRunSchema>;
 type AnalysisExplanation = z.infer<typeof analysisExplanationSchema>;
 type MarketContext = z.infer<typeof marketContextSchema>;
 type Trade = z.infer<typeof tradeSchema>;
-type TradePreview = z.infer<typeof tradePreviewSchema>;
+type Order = z.infer<typeof orderSchema>;
+type OrderPreview = z.infer<typeof orderPreviewSchema>;
+type StockHistory = z.infer<typeof stockHistorySchema>;
+type WatchlistItem = z.infer<typeof watchlistItemSchema>;
+
+type Tab = "positions" | "orders" | "fills" | "analysis";
+type Range = "1d" | "1mo" | "6mo" | "1y";
 
 export default function TradingPage() {
   const searchParams = useSearchParams();
@@ -29,59 +43,149 @@ export default function TradingPage() {
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
   const [explanation, setExplanation] = useState<AnalysisExplanation | null>(null);
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
+  const [history, setHistory] = useState<StockHistory | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [searchResults, setSearchResults] = useState<Array<{ symbol: string; description: string }>>([]);
   const [quantity, setQuantity] = useState(1);
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
   const [previewSide, setPreviewSide] = useState<"BUY" | "SELL">("BUY");
   const [limitPrice, setLimitPrice] = useState<number | "">("");
   const [stopPrice, setStopPrice] = useState<number | "">("");
-  const [tradePreview, setTradePreview] = useState<TradePreview | null>(null);
-  const [isExecuting, setIsExecuting] = useState(false);
+  const [orderPreview, setOrderPreview] = useState<OrderPreview | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [range, setRange] = useState<Range>("1mo");
+  const [activeTab, setActiveTab] = useState<Tab>("positions");
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [quoteStale, setQuoteStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const tickerRef = useRef(ticker);
+  const watchlistRef = useRef(watchlist);
 
   const normalizedTicker = ticker.trim().toUpperCase() || "AAPL";
 
-  async function refresh(targetTicker = normalizedTicker) {
+  async function refresh(targetTicker = normalizedTicker, targetRange = range) {
     const normalized = targetTicker.trim().toUpperCase() || "AAPL";
     try {
-      const [p, r, c, t] = await Promise.all([
+      const [p, r, c, h, o, t, w] = await Promise.all([
         api("/portfolio", portfolioSchema),
         api("/analysis-runs", z.array(analysisRunSchema)),
         api(`/stocks/${encodeURIComponent(normalized)}/context`, marketContextSchema),
-        api("/trades?limit=30", z.array(tradeSchema))
+        api(`/stocks/${encodeURIComponent(normalized)}/history?range=${targetRange}`, stockHistorySchema),
+        api("/orders?limit=50", z.array(orderSchema)),
+        api("/trades?limit=50", z.array(tradeSchema)),
+        api("/watchlist", z.array(watchlistItemSchema))
       ]);
       setPortfolio(p);
       setRuns(r);
       setMarketContext(c);
+      setHistory(h);
+      setOrders(o);
       setTrades(t);
+      setWatchlist(w);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to load trading data");
+      setError(e instanceof Error ? e.message : "Unable to load trading terminal data");
     }
   }
 
+  function subscribeTickers(socket: Socket, currentTicker: string, items: WatchlistItem[]) {
+    socket.emit("quote.subscribe", { ticker: currentTicker });
+    for (const item of items.slice(0, 12)) socket.emit("quote.subscribe", { ticker: item.ticker });
+  }
+
   useEffect(() => {
-    void refresh(normalizedTicker);
+    tickerRef.current = normalizedTicker;
+  }, [normalizedTicker]);
+
+  useEffect(() => {
+    watchlistRef.current = watchlist;
+  }, [watchlist]);
+
+  useEffect(() => {
+    void refresh(normalizedTicker, range);
+  }, [range]);
+
+  useEffect(() => {
+    const socket = io(WS_URL, {
+      reconnection: true,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 3000,
+      randomizationFactor: 0.4
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      setSocketConnected(true);
+      setQuoteStale(false);
+      subscribeTickers(socket, tickerRef.current, watchlistRef.current);
+    });
+    socket.on("disconnect", () => {
+      setSocketConnected(false);
+      setQuoteStale(true);
+    });
+    socket.on("quote.updated", (payload: unknown) => {
+      const parsed = marketContextSchema.shape.quote.safeParse(payload);
+      if (!parsed.success) return;
+      if (parsed.data.ticker === tickerRef.current) void refresh(tickerRef.current, range);
+    });
+    socket.on("quote.stale", (payload: any) => {
+      if (payload?.ticker === tickerRef.current) setQuoteStale(true);
+    });
+    socket.on("portfolio.updated", () => void refresh(tickerRef.current, range));
+    socket.on("order.created", () => void refresh(tickerRef.current, range));
+    socket.on("order.updated", () => void refresh(tickerRef.current, range));
+    socket.on("order.filled", () => void refresh(tickerRef.current, range));
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
-  const latest = useMemo(
-    () => runs.find((run) => run.ticker === normalizedTicker) ?? runs[0],
-    [runs, normalizedTicker]
-  );
+  useEffect(() => {
+    if (socketRef.current?.connected) subscribeTickers(socketRef.current, normalizedTicker, watchlist);
+  }, [normalizedTicker, watchlist]);
+
+  useEffect(() => {
+    const q = ticker.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const id = setTimeout(async () => {
+      try {
+        const results = await api(`/stocks/search?q=${encodeURIComponent(q)}`, stockSearchSchema, {
+          signal: controller.signal
+        });
+        setSearchResults(results.slice(0, 8));
+      } catch {
+        setSearchResults([]);
+      }
+    }, 220);
+
+    return () => {
+      controller.abort();
+      clearTimeout(id);
+    };
+  }, [ticker]);
+
+  const latest = useMemo(() => runs.find((run) => run.ticker === normalizedTicker), [runs, normalizedTicker]);
 
   useEffect(() => {
     if (!latest?.id) {
       setExplanation(null);
       return;
     }
-
     const controller = new AbortController();
     void api(`/analysis-runs/${encodeURIComponent(latest.id)}/explain`, analysisExplanationSchema, {
       signal: controller.signal
     })
       .then(setExplanation)
       .catch(() => setExplanation(null));
-
     return () => controller.abort();
   }, [latest?.id, latest?.updatedAt]);
 
@@ -89,9 +193,17 @@ export default function TradingPage() {
   const activePosition = portfolio?.positions.find((p) => p.ticker === normalizedTicker) ?? null;
   const portfolioManager = latest?.recommendations.find((r) => r.agentType === "PORTFOLIO_MANAGER");
   const teamLead = latest?.recommendations.find((r) => r.agentType === "TEAM_LEAD");
+  const openOrders = orders.filter((order) => order.status === "PENDING" || order.status === "PARTIALLY_FILLED");
+  const quoteAgeMs = quote ? Date.now() - new Date(quote.updatedAt).getTime() : Number.POSITIVE_INFINITY;
+  const quoteIsLive = quote?.source === "finnhub";
+  const historyIsLive = history?.dataQuality.status === "LIVE";
+  const terminalTradable = Boolean(orderPreview?.tradable && quoteIsLive && historyIsLive && !quoteStale);
+  const finalRec = latest?.finalRec ?? portfolioManager?.recommendation ?? "PENDING";
+  const maxExposure = Math.max(0, ...(portfolio?.positions ?? []).map((position) => position.portfolioWeight));
+  const concentration = portfolio?.positions.find((position) => position.portfolioWeight === maxExposure);
 
-  const tradeEstimate = useMemo(() => {
-    const px = tradePreview?.estimatedPrice ?? quote?.price ?? 0;
+  const orderEstimate = useMemo(() => {
+    const px = orderPreview?.estimatedPrice ?? quote?.price ?? 0;
     const qty = Math.max(1, quantity);
     const gross = px * qty;
     return {
@@ -100,21 +212,21 @@ export default function TradingPage() {
       projectedCashBuy: (portfolio?.cash ?? 0) - gross,
       projectedCashSell: (portfolio?.cash ?? 0) + gross
     };
-  }, [portfolio?.cash, quantity, quote?.price, tradePreview?.estimatedPrice]);
+  }, [portfolio?.cash, quantity, quote?.price, orderPreview?.estimatedPrice]);
 
   useEffect(() => {
     if (!quote) return;
     const controller = new AbortController();
     const id = setTimeout(async () => {
       try {
-        const preview = await api("/trades/preview", tradePreviewSchema, {
+        const preview = await api("/orders/preview", orderPreviewSchema, {
           method: "POST",
           signal: controller.signal,
-          body: JSON.stringify(tradePayload(previewSide))
+          body: JSON.stringify(orderPayload(previewSide))
         });
-        setTradePreview(preview);
+        setOrderPreview(preview);
       } catch {
-        setTradePreview(null);
+        setOrderPreview(null);
       }
     }, 180);
 
@@ -122,49 +234,72 @@ export default function TradingPage() {
       controller.abort();
       clearTimeout(id);
     };
-  }, [normalizedTicker, quantity, orderType, limitPrice, stopPrice, previewSide, quote?.price, portfolio?.cash]);
+  }, [normalizedTicker, quantity, orderType, limitPrice, stopPrice, previewSide, quote?.price, portfolio?.cash, history?.dataQuality.status]);
 
-  function tradePayload(side: "BUY" | "SELL") {
+  function orderPayload(side: "BUY" | "SELL") {
     return {
       ticker: normalizedTicker,
       side,
-      quantity: tradeEstimate.qty,
+      quantity: orderEstimate.qty,
       orderType,
       ...(orderType === "LIMIT" && typeof limitPrice === "number" ? { limitPrice } : {}),
       ...(orderType === "STOP" && typeof stopPrice === "number" ? { stopPrice } : {})
     };
   }
 
-  async function placeTrade() {
-    setIsExecuting(true);
+  async function selectTicker(symbol: string) {
+    const normalized = symbol.toUpperCase();
+    setTicker(normalized);
+    setSearchResults([]);
+    setQuoteStale(false);
+    await refresh(normalized, range);
+  }
+
+  async function addWatchlist() {
+    const item = await api("/watchlist", watchlistItemSchema, {
+      method: "POST",
+      body: JSON.stringify({ ticker: normalizedTicker })
+    });
+    setWatchlist((items) => [item, ...items.filter((x) => x.ticker !== item.ticker)]);
+  }
+
+  async function removeWatchlist(symbol: string) {
+    await api(`/watchlist/${encodeURIComponent(symbol)}`, z.object({ ticker: z.string() }), { method: "DELETE" });
+    setWatchlist((items) => items.filter((x) => x.ticker !== symbol));
+  }
+
+  async function submitOrder() {
+    setIsSubmitting(true);
     try {
-      const updated = await api("/trades", portfolioSchema, {
+      await api("/orders", orderSchema, {
         method: "POST",
-        body: JSON.stringify(tradePayload(previewSide))
+        body: JSON.stringify(orderPayload(previewSide))
       });
-      setPortfolio(updated);
-      await refresh(normalizedTicker);
+      await refresh(normalizedTicker, range);
+      setActiveTab(orderType === "MARKET" ? "fills" : "orders");
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Trade failed");
+      setError(e instanceof Error ? e.message : "Order rejected");
     } finally {
-      setIsExecuting(false);
+      setIsSubmitting(false);
     }
   }
 
-  const blockingWarning = (tradePreview?.warnings ?? []).some((warning) =>
-    warning.toLowerCase().includes("insufficient") || warning.toLowerCase().includes("unsupported")
-  );
-  const canExecute = Boolean(tradePreview?.executableNow && !blockingWarning && quote && !isExecuting);
-  const finalRec = latest?.finalRec ?? portfolioManager?.recommendation ?? "PENDING";
+  async function cancelOrder(id: string) {
+    await api(`/orders/${encodeURIComponent(id)}/cancel`, orderSchema, { method: "POST" });
+    await refresh(normalizedTicker, range);
+  }
+
+  const blockingWarning = (orderPreview?.warnings ?? []).some((warning) => warning.toLowerCase().includes("insufficient"));
+  const canSubmit = Boolean(orderPreview && terminalTradable && !blockingWarning && !isSubmitting);
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 md:px-6">
-      <PixelCard title="Trading Room" eyebrow="virtual execution" className="bg-[#fff8e7]">
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
-          <div className="grid gap-2 sm:grid-cols-[220px_1fr]">
+    <main className="mx-auto grid max-w-[1500px] gap-3 px-3 py-3 text-slate-950 sm:px-4 md:px-6">
+      <section className="grid gap-3 xl:grid-cols-[320px_1fr_360px]">
+        <div className="grid gap-3">
+          <PixelCard title="Markets" eyebrow={socketConnected ? "live terminal" : "reconnecting"} className="bg-[#fff8e7]">
             <label className="grid gap-1 text-xs font-black uppercase" htmlFor="trading-ticker">
-              Stock
+              Symbol
               <input
                 id="trading-ticker"
                 value={ticker}
@@ -172,193 +307,309 @@ export default function TradingPage() {
                 className="h-12 border-4 border-black bg-[#f7fff7] px-3 font-pixel text-sm"
               />
             </label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <StatTile label="Virtual Cash" value={formatMoney(portfolio?.cash ?? 0)} />
-              <StatTile label="Portfolio" value={formatMoney(portfolio?.totalValue ?? 0)} />
-              <StatTile label="P&L" value={`${formatMoney(portfolio?.totalPnl ?? 0)} (${formatSignedPercent(portfolio?.totalPnlPercent ?? 0)})`} tone={(portfolio?.totalPnl ?? 0) >= 0 ? "good" : "bad"} />
-              <StatTile label="Final Rec" value={finalRec} tone={finalRec === "BUY" ? "good" : finalRec === "AVOID" ? "bad" : "warn"} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <PixelButton tone="magic" onClick={() => void refresh(normalizedTicker)}>
-              Load Stock
-            </PixelButton>
-            <Link
-              href={`/?ticker=${encodeURIComponent(normalizedTicker)}`}
-              className="pixel-button min-h-10 border-2 border-black bg-[#fff8e7] px-3 py-2 text-center text-xs font-black uppercase text-slate-950 shadow-[4px_4px_0_#111]"
-            >
-              Desk
-            </Link>
-          </div>
-        </div>
-      </PixelCard>
-
-      {error ? <p className="rounded-[6px] border-4 border-red-900 bg-red-100 p-3 text-sm text-red-950 pixel-card">{error}</p> : null}
-
-      <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <div className="grid gap-4">
-          <PixelCard title="Stock Tape" eyebrow={normalizedTicker}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-4xl font-bold leading-none">{quote ? formatMoney(quote.price) : "$0.00"}</p>
-                <p className="mt-2 text-xs text-slate-600">Provider: {marketContext?.dataQuality.provider ?? "loading"}</p>
-              </div>
-              <StatusBadge value={quote ? formatSignedPercent(quote.changePercent) : "0.0%"} />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <StatTile label="Quality" value={`${marketContext?.dataQuality.status ?? "loading"} ${Math.round((marketContext?.dataQuality.score ?? 0) * 100)}%`} />
-              <StatTile label="Held Shares" value={`${activePosition?.quantity ?? 0}`} />
-              <StatTile label="Avg Cost" value={formatMoney(activePosition?.averageCost ?? 0)} />
-              <StatTile label="Exposure" value={formatSignedPercent(activePosition?.portfolioWeight ?? 0)} />
-            </div>
-          </PixelCard>
-
-          <PixelCard title="Manager Guidance" eyebrow="portfolio manager + team lead">
-            <div className="grid gap-2 text-xs">
-              <p className="border-2 border-black bg-[#f7fff7] p-2 leading-5">
-                <span className="font-bold">Portfolio Manager:</span>{" "}
-                {portfolioManager?.summary ?? latest?.finalSummary ?? "Run an analysis from the Desk to get manager guidance before trading."}
-              </p>
-              <p className="border-2 border-black bg-[#fff8e7] p-2 leading-5">
-                <span className="font-bold">Team Lead:</span>{" "}
-                {teamLead?.summary ?? "The Team Lead will summarize the committee once specialist analysis exists."}
-              </p>
-              {explanation ? (
-                <p className="border-2 border-black bg-white p-2 font-semibold">
-                  Coverage {explanation.coverage.completed}/{explanation.coverage.total} | {explanation.voteMix.BUY} BUY | {explanation.voteMix.HOLD} HOLD | {explanation.voteMix.AVOID} AVOID
-                </p>
-              ) : null}
-            </div>
-          </PixelCard>
-
-          <PixelCard title="Positions" eyebrow="portfolio">
-            <div className="max-h-72 overflow-auto border-2 border-black">
-              {(portfolio?.positions ?? []).map((p) => (
-                <div key={p.ticker} className="grid grid-cols-[64px_1fr_auto] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
-                  <button className="text-left font-semibold" onClick={() => { setTicker(p.ticker); void refresh(p.ticker); }}>
-                    {p.ticker}
+            {searchResults.length > 0 ? (
+              <div className="mt-2 grid gap-1 border-4 border-black bg-white p-2 shadow-[5px_5px_0_#111]">
+                {searchResults.map((item) => (
+                  <button
+                    key={item.symbol}
+                    className="grid grid-cols-[70px_1fr] gap-2 border-2 border-black px-2 py-2 text-left text-xs hover:bg-[#d9f0e8]"
+                    onClick={() => void selectTicker(item.symbol)}
+                  >
+                    <span className="font-pixel text-[10px]">{item.symbol}</span>
+                    <span className="truncate text-slate-600">{item.description}</span>
                   </button>
-                  <span>{p.quantity} sh @ {formatMoney(p.averageCost)}</span>
-                  <span className={(p.unrealizedPnl ?? 0) >= 0 ? "text-emerald-800" : "text-red-800"}>{formatSignedPercent(p.unrealizedPnlPercent)}</span>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <PixelButton tone="magic" onClick={() => void refresh(normalizedTicker, range)}>
+                Refresh
+              </PixelButton>
+              <PixelButton tone="good" onClick={() => void addWatchlist()}>
+                Watch
+              </PixelButton>
+            </div>
+          </PixelCard>
+
+          <PixelCard title="Watchlist" eyebrow="account scoped">
+            <div className="grid max-h-[280px] gap-2 overflow-auto pr-1">
+              {watchlist.map((item) => (
+                <div key={item.id} className="grid grid-cols-[1fr_auto] gap-2 border-2 border-black bg-[#f7fff7] px-2 py-2 text-xs">
+                  <button className="text-left font-pixel text-[10px]" onClick={() => void selectTicker(item.ticker)}>
+                    {item.ticker}
+                  </button>
+                  <button className="font-black text-red-800" aria-label={`Remove ${item.ticker}`} onClick={() => void removeWatchlist(item.ticker)}>
+                    x
+                  </button>
                 </div>
               ))}
-              {(portfolio?.positions.length ?? 0) === 0 ? <p className="p-2 text-xs text-slate-600">No simulated positions yet.</p> : null}
+              {watchlist.length === 0 ? <p className="text-xs text-slate-600">No watchlist symbols yet.</p> : null}
+            </div>
+          </PixelCard>
+
+          <PixelCard title="Account" eyebrow="buying power">
+            <div className="grid grid-cols-2 gap-2">
+              <StatTile label="Cash" value={formatMoney(portfolio?.cash ?? 0)} />
+              <StatTile label="Equity" value={formatMoney(portfolio?.totalValue ?? 0)} />
+              <StatTile label="Realized" value={formatMoney(portfolio?.realizedPnl ?? 0)} tone={(portfolio?.realizedPnl ?? 0) >= 0 ? "good" : "bad"} />
+              <StatTile label="Unrealized" value={formatMoney(portfolio?.totalUnrealizedPnl ?? 0)} tone={(portfolio?.totalUnrealizedPnl ?? 0) >= 0 ? "good" : "bad"} />
+              <StatTile label="Total P&L" value={`${formatMoney(portfolio?.totalPnl ?? 0)} ${formatSignedPercent(portfolio?.totalPnlPercent ?? 0)}`} tone={(portfolio?.totalPnl ?? 0) >= 0 ? "good" : "bad"} />
+              <StatTile label="Max Exposure" value={concentration ? `${concentration.ticker} ${formatSignedPercent(concentration.portfolioWeight)}` : "0.0%"} />
             </div>
           </PixelCard>
         </div>
 
-        <div className="grid gap-4">
-          <PixelCard title="Trade Ticket" eyebrow="preview first">
-            <p className="text-xs text-slate-700">
-              Holding {activePosition?.quantity ?? 0} shares of {normalizedTicker}. All orders are virtual simulation orders.
-            </p>
-            <div className="mt-3 grid grid-cols-[auto_1fr] items-center gap-2">
-              <label className="text-xs font-semibold" htmlFor="quantity-input">
-                Qty
-              </label>
-              <input
-                id="quantity-input"
-                type="number"
-                min={1}
-                value={tradeEstimate.qty}
-                onChange={(event) => setQuantity(Math.max(1, Number(event.target.value || "1")))}
-                className="h-10 w-full border-2 border-black px-2 text-sm"
-              />
+        <div className="grid gap-3">
+          <PixelCard title={`${normalizedTicker} Terminal`} eyebrow="instrument">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="font-pixel text-lg leading-8">{normalizedTicker}</h1>
+                  <StatusBadge value={terminalTradable ? "tradable" : "not tradable"} />
+                  <StatusBadge value={quoteStale ? "stale" : quote?.source ?? "loading"} />
+                  <StatusBadge value={history?.dataQuality.status ?? "loading"} />
+                </div>
+                <p className="mt-2 text-4xl font-black leading-none">{quote ? formatMoney(quote.price) : "$0.00"}</p>
+                <p className="mt-2 text-xs text-slate-600">
+                  {quote ? `${formatSignedPercent(quote.changePercent)} today | updated ${formatTime(quote.updatedAt)} | age ${formatAge(quoteAgeMs)}` : "Loading quote"}
+                </p>
+              </div>
+              <Link href={`/?ticker=${encodeURIComponent(normalizedTicker)}`} className="pixel-button border-2 border-black bg-[#fff8e7] px-3 py-2 text-center text-xs font-black uppercase shadow-[4px_4px_0_#111]">
+                Desk
+              </Link>
             </div>
-            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-              <label className="grid gap-1 font-semibold" htmlFor="order-type-input">
-                Order
+            {orderPreview?.blockingReasons.length ? (
+              <div className="mt-3 grid gap-1">
+                {orderPreview.blockingReasons.map((reason) => (
+                  <p key={reason} className="border-2 border-red-900 bg-red-100 px-2 py-1 text-xs font-semibold text-red-950">
+                    {reason}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+          </PixelCard>
+
+          <PixelCard title="Price Chart" eyebrow="historical candles">
+            <div className="mb-3 flex flex-wrap gap-2">
+              {(["1d", "1mo", "6mo", "1y"] as Range[]).map((nextRange) => (
+                <button
+                  key={nextRange}
+                  className={`border-2 border-black px-2 py-1 text-xs font-black uppercase ${range === nextRange ? "bg-[#7c3aed] text-white" : "bg-white"}`}
+                  onClick={() => setRange(nextRange)}
+                >
+                  {nextRange}
+                </button>
+              ))}
+            </div>
+            <PriceChart history={history} />
+          </PixelCard>
+
+          <PixelCard title="Blotter" eyebrow="positions / orders / fills / analysis">
+            <div className="mb-3 grid grid-cols-4 gap-2">
+              {([
+                ["positions", "Positions"],
+                ["orders", "Open Orders"],
+                ["fills", "Fills"],
+                ["analysis", "Analysis"]
+              ] as Array<[Tab, string]>).map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`min-h-10 border-2 border-black px-1 text-[10px] font-black uppercase ${activeTab === id ? "bg-[#101827] text-white" : "bg-white"}`}
+                  onClick={() => setActiveTab(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {activeTab === "positions" ? <PositionsPanel positions={portfolio?.positions ?? []} onSelect={(symbol) => void selectTicker(symbol)} /> : null}
+            {activeTab === "orders" ? <OrdersPanel orders={openOrders} onCancel={(id) => void cancelOrder(id)} /> : null}
+            {activeTab === "fills" ? <FillsPanel trades={trades} /> : null}
+            {activeTab === "analysis" ? <AnalysisPanel finalRec={finalRec} portfolioManager={portfolioManager?.summary ?? latest?.finalSummary ?? null} teamLead={teamLead?.summary ?? null} explanation={explanation} /> : null}
+          </PixelCard>
+        </div>
+
+        <div className="grid gap-3">
+          <PixelCard title="Order Ticket" eyebrow="live data required" className="bg-[#fff8e7]">
+            <div className="grid grid-cols-2 gap-2">
+              <PixelButton tone={previewSide === "BUY" ? "good" : "neutral"} onClick={() => setPreviewSide("BUY")}>
+                Buy
+              </PixelButton>
+              <PixelButton tone={previewSide === "SELL" ? "warn" : "neutral"} onClick={() => setPreviewSide("SELL")}>
+                Sell
+              </PixelButton>
+            </div>
+            <div className="mt-3 grid gap-3">
+              <label className="grid gap-1 text-xs font-black uppercase" htmlFor="order-type-input">
+                Order Type
                 <select
                   id="order-type-input"
                   value={orderType}
                   onChange={(event) => setOrderType(event.target.value as "MARKET" | "LIMIT" | "STOP")}
-                  className="h-10 border-2 border-black bg-white px-2 text-sm"
+                  className="h-11 border-4 border-black bg-white px-2 text-sm"
                 >
                   <option value="MARKET">Market</option>
                   <option value="LIMIT">Limit</option>
                   <option value="STOP">Stop</option>
                 </select>
               </label>
+              <label className="grid gap-1 text-xs font-black uppercase" htmlFor="quantity-input">
+                Quantity
+                <input
+                  id="quantity-input"
+                  type="number"
+                  min={1}
+                  value={orderEstimate.qty}
+                  onChange={(event) => setQuantity(Math.max(1, Number(event.target.value || "1")))}
+                  className="h-11 border-4 border-black bg-white px-2 text-sm"
+                />
+              </label>
               {orderType === "LIMIT" ? (
-                <label className="grid gap-1 font-semibold" htmlFor="limit-price-input">
-                  Limit
-                  <input
-                    id="limit-price-input"
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    value={limitPrice}
-                    placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"}
-                    onChange={(event) => setLimitPrice(event.target.value === "" ? "" : Number(event.target.value))}
-                    className="h-10 border-2 border-black px-2 text-sm"
-                  />
+                <label className="grid gap-1 text-xs font-black uppercase" htmlFor="limit-price-input">
+                  Limit Price
+                  <input id="limit-price-input" type="number" min={0.01} step={0.01} value={limitPrice} placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"} onChange={(event) => setLimitPrice(event.target.value === "" ? "" : Number(event.target.value))} className="h-11 border-4 border-black bg-white px-2 text-sm" />
                 </label>
               ) : null}
               {orderType === "STOP" ? (
-                <label className="grid gap-1 font-semibold" htmlFor="stop-price-input">
-                  Stop
-                  <input
-                    id="stop-price-input"
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    value={stopPrice}
-                    placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"}
-                    onChange={(event) => setStopPrice(event.target.value === "" ? "" : Number(event.target.value))}
-                    className="h-10 border-2 border-black px-2 text-sm"
-                  />
+                <label className="grid gap-1 text-xs font-black uppercase" htmlFor="stop-price-input">
+                  Stop Price
+                  <input id="stop-price-input" type="number" min={0.01} step={0.01} value={stopPrice} placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"} onChange={(event) => setStopPrice(event.target.value === "" ? "" : Number(event.target.value))} className="h-11 border-4 border-black bg-white px-2 text-sm" />
                 </label>
               ) : null}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <PixelButton tone={previewSide === "BUY" ? "good" : "neutral"} onClick={() => setPreviewSide("BUY")}>
-                Preview Buy
-              </PixelButton>
-              <PixelButton tone={previewSide === "SELL" ? "warn" : "neutral"} onClick={() => setPreviewSide("SELL")}>
-                Preview Sell
-              </PixelButton>
-            </div>
-            <div className="mt-3 grid gap-1 text-xs">
-              <p>Estimated cost/proceeds: {formatMoney(tradeEstimate.gross)}</p>
-              <p>Projected cash after buy: {formatMoney(tradeEstimate.projectedCashBuy)}</p>
-              <p>Projected cash after sell: {formatMoney(tradeEstimate.projectedCashSell)}</p>
-              {tradePreview ? (
+
+            <div className="mt-3 grid gap-1 border-2 border-black bg-white p-2 text-xs">
+              <p>Buying power: {formatMoney(portfolio?.cash ?? 0)}</p>
+              <p>Held shares: {activePosition?.quantity ?? 0}</p>
+              <p>Estimated cost/proceeds: {formatMoney(orderEstimate.gross)}</p>
+              <p>Projected cash after buy: {formatMoney(orderEstimate.projectedCashBuy)}</p>
+              <p>Projected cash after sell: {formatMoney(orderEstimate.projectedCashSell)}</p>
+              {orderPreview ? (
                 <>
-                  <p>Trigger status: {tradePreview.executableNow ? "Executable now" : "Waiting for trigger"}</p>
-                  <p>{tradePreview.sizingHint.message}</p>
-                  <p>Projected exposure: {formatSignedPercent(tradePreview.sizingHint.projectedExposurePercent)}</p>
+                  <p>Trigger: {orderPreview.executableNow ? "fills now" : "rests open"}</p>
+                  <p>Projected exposure: {formatSignedPercent(orderPreview.sizingHint.projectedExposurePercent)}</p>
                 </>
               ) : null}
             </div>
-            {(tradePreview?.warnings ?? []).length > 0 ? (
+            {(orderPreview?.warnings ?? []).length > 0 ? (
               <div className="mt-3 grid gap-1">
-                {tradePreview?.warnings.map((warning) => (
+                {orderPreview?.warnings.map((warning) => (
                   <p key={warning} className="border border-amber-900 bg-amber-100 px-2 py-1 text-xs text-amber-950">
                     {warning}
                   </p>
                 ))}
               </div>
             ) : null}
-            <PixelButton tone={previewSide === "BUY" ? "good" : "warn"} className="mt-3 w-full" onClick={() => void placeTrade()} disabled={!canExecute}>
-              {isExecuting ? "Executing" : `Execute ${previewSide} ${tradeEstimate.qty}`}
+            <PixelButton tone={previewSide === "BUY" ? "good" : "warn"} className="mt-3 w-full" onClick={() => void submitOrder()} disabled={!canSubmit}>
+              {isSubmitting ? "Submitting" : orderType === "MARKET" ? `${previewSide} at Market` : `Place ${previewSide} ${orderType}`}
             </PixelButton>
+            {!terminalTradable ? <p className="mt-3 border-2 border-red-900 bg-red-100 p-2 text-xs font-semibold text-red-950">Order entry is disabled until quote and chart data are live and fresh.</p> : null}
           </PixelCard>
 
-          <PixelCard title="Recent Trades" eyebrow="virtual order tape">
-            <div className="max-h-72 overflow-auto border-2 border-black">
-              {trades.map((trade) => (
-                <div key={trade.id} className="grid grid-cols-[52px_58px_1fr] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
-                  <span className={trade.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-slate-800"}>{trade.side}</span>
-                  <span>{trade.ticker}</span>
-                  <span className="text-right">{trade.quantity} @ {formatMoney(trade.price)} {trade.orderType ? `(${trade.orderType})` : ""}</span>
-                </div>
-              ))}
-              {trades.length === 0 ? <p className="p-2 text-xs text-slate-600">No simulated trades yet.</p> : null}
+          <PixelCard title="Open Risk" eyebrow="guardrails">
+            <div className="grid gap-2 text-xs">
+              <StatTile label="Open Orders" value={`${openOrders.length}`} />
+              <StatTile label="Selected Exposure" value={formatSignedPercent(activePosition?.portfolioWeight ?? 0)} />
+              <StatTile label="Final Rec" value={finalRec} tone={finalRec === "BUY" ? "good" : finalRec === "AVOID" ? "bad" : "warn"} />
+              <p className="border-2 border-black bg-[#f7fff7] p-2 leading-5">
+                {orderPreview?.sizingHint.message ?? "Preview an order to see buying power, exposure, trigger, and concentration checks."}
+              </p>
             </div>
           </PixelCard>
         </div>
       </section>
+
+      {error ? <p className="rounded-[6px] border-4 border-red-900 bg-red-100 p-3 text-sm text-red-950 pixel-card">{error}</p> : null}
     </main>
+  );
+}
+
+function PriceChart({ history }: { history: StockHistory | null }) {
+  const candles = history?.candles ?? [];
+  if (candles.length === 0) return <div className="grid h-[320px] place-items-center border-2 border-black bg-white text-xs text-slate-600">No chart candles available.</div>;
+
+  const width = 900;
+  const height = 320;
+  const pad = 24;
+  const closes = candles.map((candle) => candle.close);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const spread = Math.max(1, max - min);
+  const points = candles.map((candle, idx) => {
+    const x = pad + (idx / Math.max(1, candles.length - 1)) * (width - pad * 2);
+    const y = height - pad - ((candle.close - min) / spread) * (height - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const latest = candles.at(-1);
+
+  return (
+    <div className="overflow-hidden border-2 border-black bg-[#101827]">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[320px] w-full" role="img" aria-label={`${history?.ticker ?? "Stock"} price chart`}>
+        {[0, 1, 2, 3].map((line) => {
+          const y = pad + line * ((height - pad * 2) / 3);
+          return <line key={line} x1={pad} x2={width - pad} y1={y} y2={y} stroke="#334155" strokeWidth="1" />;
+        })}
+        <polyline fill="none" stroke="#22c55e" strokeWidth="4" points={points.join(" ")} />
+        {latest ? <text x={pad} y={height - 8} fill="#c7f9cc" fontSize="14">{latest.date} close {formatMoney(latest.close)}</text> : null}
+      </svg>
+    </div>
+  );
+}
+
+function PositionsPanel({ positions, onSelect }: { positions: Portfolio["positions"]; onSelect: (ticker: string) => void }) {
+  if (positions.length === 0) return <p className="border-2 border-black bg-white p-3 text-xs text-slate-600">No positions yet.</p>;
+  return (
+    <div className="max-h-[360px] overflow-auto border-2 border-black">
+      {positions.map((position) => (
+        <div key={position.ticker} className="grid grid-cols-[70px_1fr_auto] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
+          <button className="text-left font-pixel text-[10px]" onClick={() => onSelect(position.ticker)}>{position.ticker}</button>
+          <span>{position.quantity} sh @ {formatMoney(position.averageCost)} | MV {formatMoney(position.marketValue)}</span>
+          <span className={(position.unrealizedPnl ?? 0) >= 0 ? "font-semibold text-emerald-800" : "font-semibold text-red-800"}>{formatSignedPercent(position.unrealizedPnlPercent)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OrdersPanel({ orders, onCancel }: { orders: Order[]; onCancel: (id: string) => void }) {
+  if (orders.length === 0) return <p className="border-2 border-black bg-white p-3 text-xs text-slate-600">No open orders.</p>;
+  return (
+    <div className="max-h-[360px] overflow-auto border-2 border-black">
+      {orders.map((order) => (
+        <div key={order.id} className="grid grid-cols-[54px_54px_1fr_auto] items-center gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
+          <span className={order.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-red-800"}>{order.side}</span>
+          <span>{order.ticker}</span>
+          <span>{order.quantity - order.filledQuantity} open / {order.quantity} {order.orderType} {order.limitPrice ? `LMT ${formatMoney(order.limitPrice)}` : ""}{order.stopPrice ? `STP ${formatMoney(order.stopPrice)}` : ""}</span>
+          <button className="border-2 border-black bg-red-100 px-2 py-1 font-black text-red-900" onClick={() => onCancel(order.id)}>Cancel</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FillsPanel({ trades }: { trades: Trade[] }) {
+  if (trades.length === 0) return <p className="border-2 border-black bg-white p-3 text-xs text-slate-600">No fills yet.</p>;
+  return (
+    <div className="max-h-[360px] overflow-auto border-2 border-black">
+      {trades.map((trade) => (
+        <div key={trade.id} className="grid grid-cols-[54px_60px_1fr_auto] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
+          <span className={trade.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-red-800"}>{trade.side}</span>
+          <span>{trade.ticker}</span>
+          <span>{trade.quantity} @ {formatMoney(trade.price)} {trade.orderType ? `(${trade.orderType})` : ""}</span>
+          <span>{formatTime(trade.createdAt)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AnalysisPanel({ finalRec, portfolioManager, teamLead, explanation }: { finalRec: string; portfolioManager: string | null; teamLead: string | null; explanation: AnalysisExplanation | null }) {
+  return (
+    <div className="grid gap-2 text-xs">
+      <StatusBadge value={`Final ${finalRec}`} />
+      <p className="border-2 border-black bg-[#f7fff7] p-2 leading-5">{portfolioManager ?? "No manager analysis exists for this ticker yet."}</p>
+      <p className="border-2 border-black bg-[#fff8e7] p-2 leading-5">{teamLead ?? "No team-lead summary exists for this ticker yet."}</p>
+      {explanation ? <p className="border-2 border-black bg-white p-2 font-semibold">Coverage {explanation.coverage.completed}/{explanation.coverage.total} | {explanation.voteMix.BUY} BUY | {explanation.voteMix.HOLD} HOLD | {explanation.voteMix.AVOID} AVOID</p> : null}
+    </div>
   );
 }
 
@@ -368,4 +619,14 @@ function formatMoney(value: number) {
 
 function formatSignedPercent(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatAge(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "unknown";
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  return `${Math.round(ms / 60_000)}m`;
 }

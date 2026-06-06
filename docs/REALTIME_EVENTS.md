@@ -62,6 +62,16 @@ Behavior:
 ### `portfolio.updated`
 - Payload shape: `Portfolio`
 
+### `order.created`
+- Payload shape: `Order`
+
+### `order.updated`
+- Payload shape: `Order`
+
+### `order.filled`
+- Payload shape: `Order`
+
 ## Ordering Notes
 - Agent lifecycle is emitted per-agent in execution order.
 - Portfolio manager completion/failure occurs after specialist attempts finish.
+- Order fill events are followed by `portfolio.updated`.

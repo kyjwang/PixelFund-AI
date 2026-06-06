@@ -4,6 +4,7 @@ export const tickerSchema = z.string().trim().min(1).max(10).toUpperCase();
 export const recommendationSchema = z.enum(["BUY", "HOLD", "AVOID"]);
 export const agentStatusSchema = z.enum(["PENDING", "RUNNING", "COMPLETED", "FAILED"]);
 export const dataQualityStatusSchema = z.enum(["LIVE", "PARTIAL", "DELAYED", "UNSUPPORTED", "DEMO"]);
+export const orderStatusSchema = z.enum(["PENDING", "FILLED", "PARTIALLY_FILLED", "CANCELED", "REJECTED", "EXPIRED"]);
 export const agentTypeSchema = z.enum([
   "TECHNICAL_ANALYST",
   "NEWS_ANALYST",
@@ -179,6 +180,16 @@ export const tradePreviewSchema = z.object({
   warnings: z.array(z.string())
 });
 
+export const orderCreateSchema = tradeCreateSchema;
+
+export const orderPreviewSchema = tradePreviewSchema.extend({
+  tradable: z.boolean(),
+  quoteSource: z.string(),
+  quoteUpdatedAt: z.string(),
+  dataQualityStatus: dataQualityStatusSchema,
+  blockingReasons: z.array(z.string())
+});
+
 export const analysisRunCreateSchema = z.object({
   ticker: tickerSchema,
   idempotencyKey: z.string().min(1).max(128).optional()
@@ -240,6 +251,7 @@ export const portfolioSchema = z.object({
 
 export const tradeSchema = z.object({
   id: z.string(),
+  orderId: z.string().nullable().optional(),
   ticker: tickerSchema,
   side: z.enum(["BUY", "SELL"]),
   quantity: z.number().int().positive(),
@@ -247,6 +259,26 @@ export const tradeSchema = z.object({
   orderType: z.enum(["MARKET", "LIMIT", "STOP"]).optional(),
   requestedPrice: z.number().nullable().optional(),
   createdAt: z.coerce.string()
+});
+
+export const orderSchema = z.object({
+  id: z.string(),
+  ticker: tickerSchema,
+  side: z.enum(["BUY", "SELL"]),
+  quantity: z.number().int().positive(),
+  filledQuantity: z.number().int().nonnegative(),
+  status: orderStatusSchema,
+  orderType: z.enum(["MARKET", "LIMIT", "STOP"]),
+  limitPrice: z.number().nullable().optional(),
+  stopPrice: z.number().nullable().optional(),
+  averageFillPrice: z.number().nullable().optional(),
+  lastCheckedPrice: z.number().nullable().optional(),
+  rejectionReason: z.string().nullable().optional(),
+  createdAt: z.coerce.string(),
+  updatedAt: z.coerce.string(),
+  filledAt: z.coerce.string().nullable().optional(),
+  canceledAt: z.coerce.string().nullable().optional(),
+  expiresAt: z.coerce.string().nullable().optional()
 });
 
 export const agentResultSchema = z.object({
@@ -344,6 +376,9 @@ export const wsPortfolioRecommendationFailedSchema = z.object({
   status: z.literal("FAILED"),
   errorReason: z.string()
 });
+export const wsOrderCreatedSchema = orderSchema;
+export const wsOrderUpdatedSchema = orderSchema;
+export const wsOrderFilledSchema = orderSchema;
 
 export const errorEnvelopeSchema = z.object({
   error: z.object({
@@ -375,6 +410,10 @@ export type Portfolio = z.infer<typeof portfolioSchema>;
 export type Trade = z.infer<typeof tradeSchema>;
 export type TradeCreateInput = z.infer<typeof tradeCreateSchema>;
 export type TradePreview = z.infer<typeof tradePreviewSchema>;
+export type Order = z.infer<typeof orderSchema>;
+export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
+export type OrderPreview = z.infer<typeof orderPreviewSchema>;
+export type OrderStatus = z.infer<typeof orderStatusSchema>;
 export type AnalysisRun = z.infer<typeof analysisRunSchema>;
 export type AgentResult = z.infer<typeof agentResultSchema>;
 export type AnalysisExplanation = z.infer<typeof analysisExplanationSchema>;

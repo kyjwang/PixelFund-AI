@@ -8,11 +8,16 @@ export class QuotesService implements OnModuleDestroy {
   private quoteCache = new Map<string, { updatedAt: string; quote: any }>();
   private stopPolling: (() => void) | null = null;
   private emitEvent: ((event: string, payload: unknown) => void) | null = null;
+  private quoteObserver: ((quote: any) => void) | null = null;
 
   constructor(private readonly market: MarketService) {}
 
   setEmitter(emit: (event: string, payload: unknown) => void) {
     this.emitEvent = emit;
+  }
+
+  setQuoteObserver(observer: (quote: any) => void) {
+    this.quoteObserver = observer;
   }
 
   ensureSubscription(clientId: string, ticker: string) {
@@ -40,6 +45,7 @@ export class QuotesService implements OnModuleDestroy {
     this.stopPolling = this.market.subscribeQuotes(dedupedTickers, (quote) => {
       this.quoteCache.set(quote.ticker, { quote, updatedAt: quote.updatedAt });
       this.emitEvent?.("quote.updated", quote);
+      this.quoteObserver?.(quote);
       const staleMs = Number(process.env.QUOTE_STALE_MS ?? "20000");
       setTimeout(() => {
         const cached = this.quoteCache.get(quote.ticker);

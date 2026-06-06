@@ -6,6 +6,9 @@ import {
   buildAgentAnalysis,
   buildAnalysisExplanation,
   computeTechnicalIndicators,
+  canCancelOrder,
+  evaluateOrderFill,
+  isOrderTriggered,
   runPortfolioManagerBacktest
 } from "../src/index";
 import type { MarketContext } from "@pixelfund/schemas";
@@ -50,6 +53,37 @@ describe("portfolio accounting", () => {
     expect(sell1.realizedPnlDelta).toBe(44);
     const sell2 = applyTrade(sell1.cash, sell1.positions, "NVDA", "SELL", 2, 120);
     expect(sell2.realizedPnlDelta).toBeCloseTo(-32, 5);
+  });
+});
+
+describe("order lifecycle rules", () => {
+  test("limit and stop triggers follow broker-style side rules", () => {
+    expect(isOrderTriggered({ side: "BUY", orderType: "LIMIT", currentPrice: 99, limitPrice: 100 })).toBe(true);
+    expect(isOrderTriggered({ side: "BUY", orderType: "LIMIT", currentPrice: 101, limitPrice: 100 })).toBe(false);
+    expect(isOrderTriggered({ side: "SELL", orderType: "LIMIT", currentPrice: 101, limitPrice: 100 })).toBe(true);
+    expect(isOrderTriggered({ side: "SELL", orderType: "STOP", currentPrice: 99, stopPrice: 100 })).toBe(true);
+    expect(isOrderTriggered({ side: "BUY", orderType: "STOP", currentPrice: 101, stopPrice: 100 })).toBe(true);
+  });
+
+  test("evaluates full and partial fills", () => {
+    expect(evaluateOrderFill({ quantity: 10, filledQuantity: 0, side: "BUY", orderType: "MARKET", currentPrice: 50 })).toEqual({
+      shouldFill: true,
+      fillQuantity: 10,
+      nextStatus: "FILLED"
+    });
+
+    expect(evaluateOrderFill({ quantity: 10, filledQuantity: 2, availableQuantity: 3, side: "BUY", orderType: "LIMIT", currentPrice: 49, limitPrice: 50 })).toEqual({
+      shouldFill: true,
+      fillQuantity: 3,
+      nextStatus: "PARTIALLY_FILLED"
+    });
+  });
+
+  test("only open orders can be canceled", () => {
+    expect(canCancelOrder("PENDING")).toBe(true);
+    expect(canCancelOrder("PARTIALLY_FILLED")).toBe(true);
+    expect(canCancelOrder("FILLED")).toBe(false);
+    expect(canCancelOrder("REJECTED")).toBe(false);
   });
 });
 

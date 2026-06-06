@@ -485,9 +485,9 @@ export default function HomePage() {
         </section>
 
         <section className="grid gap-3 md:grid-cols-4" aria-label="More rooms">
-          <RoomLink href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Trading Room" detail="Quote, portfolio, virtual money, and guided trade ticket." />
+          <RoomLink href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Trading Terminal" detail="Live quote gate, account panels, watchlist, open orders, and fills." />
           <RoomLink href={`/research?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Research Room" detail="Agent debate, evidence, caveats, and team-meeting notes." />
-          <RoomLink href="/history" title="History Vault" detail="Watchlist, recommendations, and simulated trade log." />
+          <RoomLink href="/history" title="History Vault" detail="Watchlist, recommendations, and account-scoped fill history." />
           <RoomLink href={`/backtest?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Backtest Lab" detail="Replay the manager signal against historical closes." />
         </section>
       </div>

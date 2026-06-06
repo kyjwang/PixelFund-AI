@@ -56,7 +56,7 @@ export default function HistoryPage() {
         <div className="grid gap-2 sm:grid-cols-3">
           <StatTile label="Watchlist" value={`${watchlist.length} tickers`} />
           <StatTile label="Recommendations" value={`${runs.length} runs`} />
-          <StatTile label="Simulated Trades" value={`${trades.length} orders`} />
+          <StatTile label="Fills" value={`${trades.length} records`} />
         </div>
       </PixelCard>
 
@@ -101,7 +101,7 @@ export default function HistoryPage() {
           </div>
         </PixelCard>
 
-        <PixelCard title="Trade History" eyebrow="virtual order tape">
+        <PixelCard title="Fill History" eyebrow="virtual order tape">
           <div className="max-h-[420px] overflow-auto border-2 border-black">
             {trades.map((trade) => (
               <div key={trade.id} className="grid grid-cols-[52px_58px_1fr] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
@@ -110,7 +110,7 @@ export default function HistoryPage() {
                 <span className="text-right">{trade.quantity} @ {formatMoney(trade.price)} {trade.orderType ? `(${trade.orderType})` : ""}</span>
               </div>
             ))}
-            {trades.length === 0 ? <p className="p-2 text-xs text-slate-600">No simulated trades yet.</p> : null}
+            {trades.length === 0 ? <p className="p-2 text-xs text-slate-600">No fills yet.</p> : null}
           </div>
         </PixelCard>
       </section>

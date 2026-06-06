@@ -13,6 +13,7 @@ import { StartupService } from "./common/config/startup.service";
 import { WatchlistModule } from "./watchlist/watchlist.module";
 import { BacktestsModule } from "./backtests/backtests.module";
 import { HealthModule } from "./health/health.module";
+import { OrdersModule } from "./orders/orders.module";
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { HealthModule } from "./health/health.module";
     BullModule.forRoot({ connection: { url: process.env.REDIS_URL } }),
     PortfolioModule,
     TradesModule,
+    OrdersModule,
     AnalysisModule,
     MarketModule,
     BacktestsModule,

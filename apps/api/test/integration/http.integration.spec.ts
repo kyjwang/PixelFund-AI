@@ -11,6 +11,8 @@ import {
   portfolioSchema,
   providerCapabilitiesSchema,
   quoteSchema,
+  orderSchema,
+  orderPreviewSchema,
   stockHistorySchema,
   tradeSchema,
   watchlistItemSchema
@@ -173,6 +175,44 @@ describe("http integration", () => {
     const res = await request(server).get("/trades").expect(200);
     expect(() => tradeSchema.array().parse(res.body.data)).not.toThrow();
     expect(res.body.data[0].ticker).toBe("MSFT");
+  });
+
+  test("order preview fails closed when market data is not tradable", async () => {
+    const res = await request(server)
+      .post("/orders/preview")
+      .send({ ticker: "AAPL", side: "BUY", quantity: 1, orderType: "MARKET" })
+      .expect(201);
+    const parsed = orderPreviewSchema.parse(res.body.data);
+    expect(parsed.tradable).toBe(false);
+    expect(parsed.blockingReasons.length).toBeGreaterThan(0);
+  });
+
+  test("order creation rejects demo or stale market data", async () => {
+    const res = await request(server)
+      .post("/orders")
+      .send({ ticker: "AAPL", side: "BUY", quantity: 1, orderType: "MARKET" })
+      .expect(400);
+    expect(res.body.error.code).toBe("MARKET_DATA_NOT_TRADABLE");
+  });
+
+  test("order listing and cancel are account scoped", async () => {
+    const accountA = await prisma.demoAccount.create({ data: { ownerKey: "orders-a", cash: 100000 } });
+    const accountB = await prisma.demoAccount.create({ data: { ownerKey: "orders-b", cash: 100000 } });
+    const orderA = await prisma.order.create({
+      data: { accountId: accountA.id, ticker: "MSFT", side: "BUY", quantity: 1, orderType: "LIMIT", limitPrice: 1, status: "PENDING" }
+    });
+    await prisma.order.create({
+      data: { accountId: accountB.id, ticker: "AAPL", side: "BUY", quantity: 1, orderType: "LIMIT", limitPrice: 1, status: "PENDING" }
+    });
+
+    const listA = await request(server).get("/orders").set("x-demo-user-id", "orders-a").expect(200);
+    const parsedA = orderSchema.array().parse(listA.body.data);
+    expect(parsedA.map((order) => order.ticker)).toEqual(["MSFT"]);
+
+    const canceled = await request(server).post(`/orders/${orderA.id}/cancel`).set("x-demo-user-id", "orders-a").expect(201);
+    expect(orderSchema.parse(canceled.body.data).status).toBe("CANCELED");
+
+    await request(server).post(`/orders/${orderA.id}/cancel`).set("x-demo-user-id", "orders-b").expect(404);
   });
 
   test("isolates watchlists by demo account header", async () => {

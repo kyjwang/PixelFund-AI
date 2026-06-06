@@ -27,19 +27,22 @@
 1. Ticker selection and quote visibility.
 2. Analysis run creation and agent lifecycle updates.
 3. Portfolio Manager summary recommendation (`BUY|HOLD|AVOID`).
-4. Trade preview with order type, trigger status, projected cash/shares, warnings, and sizing hint.
-5. Virtual buy/sell trade execution with immediate portfolio update when the order is executable.
+4. Order preview with order type, trigger status, projected cash/shares, warnings, live-data tradability, and sizing hint.
+5. Durable simulator order creation with immediate market fills only on fresh live provider data.
 6. Recommendation and portfolio state persistence.
 7. Manager explainability with backend-computed committee vote mix, coverage, confidence, weights, contributions, top contributors, reasons, and data-quality caveats.
 
 ## Constraints
 - Educational simulation only; not financial advice.
-- Browser-isolated simulation accounts for portfolio, watchlist, and trade history; not production auth.
+- Browser-isolated simulation accounts for portfolio, watchlist, orders, and fill history; not production auth.
 - Market data provider abstraction must support future provider swap.
-- Limit/stop orders are trigger-checked immediate simulations, not durable pending orders.
+- Trading execution fails closed when market data is demo, fallback, unsupported, or stale.
+- Limit/stop orders remain pending until fresh live quotes cross their triggers.
 
 ## Domain Invariants
-- Trade validation errors:
+- Order and trade validation errors:
+  - `MARKET_DATA_NOT_TRADABLE`
+  - `ORDER_REJECTED`
   - `INSUFFICIENT_FUNDS`
   - `INSUFFICIENT_SHARES`
   - `ORDER_NOT_TRIGGERED`

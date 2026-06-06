@@ -44,6 +44,15 @@ enum AgentStatus {
   FAILED
 }
 
+enum OrderStatus {
+  PENDING
+  FILLED
+  PARTIALLY_FILLED
+  CANCELED
+  REJECTED
+  EXPIRED
+}
+
 enum Recommendation {
   BUY
   HOLD
@@ -57,6 +66,7 @@ model DemoAccount {
   realizedPnl Float     @default(0)
   positions Position[]
   trades    Trade[]
+  orders    Order[]
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 }
@@ -78,6 +88,8 @@ model Trade {
   id        String      @id @default(cuid())
   accountId String
   account   DemoAccount @relation(fields: [accountId], references: [id])
+  orderId   String?
+  order     Order?      @relation(fields: [orderId], references: [id])
   ticker    String
   side      TradeSide
   quantity  Int
@@ -85,6 +97,34 @@ model Trade {
   orderType OrderType   @default(MARKET)
   requestedPrice Float?
   createdAt DateTime    @default(now())
+
+  @@index([orderId])
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  accountId String
+  account   DemoAccount @relation(fields: [accountId], references: [id])
+  ticker    String
+  side      TradeSide
+  quantity  Int
+  filledQuantity Int     @default(0)
+  status    OrderStatus @default(PENDING)
+  orderType OrderType   @default(MARKET)
+  limitPrice Float?
+  stopPrice  Float?
+  averageFillPrice Float?
+  lastCheckedPrice Float?
+  rejectionReason String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  filledAt  DateTime?
+  canceledAt DateTime?
+  expiresAt DateTime?
+  trades    Trade[]
+
+  @@index([accountId, status, createdAt])
+  @@index([ticker, status])
 }
 
 model WatchlistItem {

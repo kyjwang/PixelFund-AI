@@ -92,7 +92,7 @@ Most trading simulators feel either too dry (spreadsheet dashboards) or too gami
 - Includes run timestamp and data freshness state
 - Visual expression badge maps to animation state
 
-### Screen C: Portfolio + Trade Ticket Panel
+### Screen C: Trading Terminal
 - Current cash, buying power, holdings table, P&L blocks
 - Trade ticket with side (buy/sell), quantity, estimated impact
 - Validation messaging for insufficient funds/shares

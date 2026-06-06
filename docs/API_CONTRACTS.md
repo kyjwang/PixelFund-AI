@@ -42,18 +42,55 @@
 - Response: `{ data: Portfolio }`
 - Portfolio fields: `accountKey`, `cash`, `totalValue`, `totalPnl`, `totalPnlPercent`, `realizedPnl`, `totalUnrealizedPnl`, `positions[]`
 
+### `POST /orders/preview`
+- Purpose: validate simulator order intent before creation and report whether live market data is tradable
+- Header: optional `x-demo-user-id`
+- Request body:
+```json
+{ "ticker": "AAPL", "side": "BUY|SELL", "quantity": 1, "orderType": "MARKET|LIMIT|STOP", "limitPrice": 200, "stopPrice": 180 }
+```
+- Response: `{ data: OrderPreview }`
+- Preview fields: `currentPrice`, `estimatedPrice`, `estimatedGross`, `projectedCash`, `projectedShares`, `executableNow`, `sizingHint`, `warnings[]`, `tradable`, `quoteSource`, `quoteUpdatedAt`, `dataQualityStatus`, `blockingReasons[]`
+
+### `POST /orders`
+- Purpose: create a durable simulator order
+- Header: optional `x-demo-user-id`
+- Request body:
+```json
+{ "ticker": "AAPL", "side": "BUY|SELL", "quantity": 1, "orderType": "MARKET|LIMIT|STOP", "limitPrice": 200, "stopPrice": 180 }
+```
+- Response: `{ data: Order }`
+- Behavior:
+  - Market orders fill immediately only when live provider quotes and history are available and fresh.
+  - Limit/stop orders persist as `PENDING` until a future live quote crosses the trigger.
+  - Demo, fallback, unsupported, or stale market data fails closed with no execution.
+- Domain error codes:
+  - `MARKET_DATA_NOT_TRADABLE`
+  - `ORDER_REJECTED`
+
+### `GET /orders?status={status}&limit={n}`
+- Purpose: list durable simulator orders for the current account
+- Header: optional `x-demo-user-id` isolates order history and open orders
+- Response: `{ data: Order[] }`
+
+### `POST /orders/:id/cancel`
+- Purpose: cancel a pending or partially filled simulator order
+- Header: optional `x-demo-user-id`
+- Response: `{ data: Order }`
+- Domain error codes:
+  - `ORDER_NOT_CANCELABLE`
+
 ### `POST /trades/preview`
-- Purpose: validate a virtual trade before execution
+- Purpose: legacy virtual trade preview kept for compatibility
 - Header: optional `x-demo-user-id`
 - Request body:
 ```json
 { "ticker": "AAPL", "side": "BUY|SELL", "quantity": 1, "orderType": "MARKET|LIMIT|STOP", "limitPrice": 200, "stopPrice": 180 }
 ```
 - Response: `{ data: TradePreview }`
-- Preview fields: `currentPrice`, `estimatedPrice`, `estimatedGross`, `projectedCash`, `projectedShares`, `executableNow`, `sizingHint`, `warnings[]`
 
 ### `POST /trades`
-- Purpose: place virtual trade
+- Purpose: legacy immediate virtual trade placement kept for compatibility
 - Header: optional `x-demo-user-id`
 - Request body:
 ```json
@@ -68,8 +105,8 @@
   - `UNSUPPORTED_MARKET_DATA`
 
 ### `GET /trades?limit={n}`
-- Purpose: recent virtual trade history
-- Header: optional `x-demo-user-id` isolates the account trade tape
+- Purpose: recent simulator fill history
+- Header: optional `x-demo-user-id` isolates the account fills
 - Response: `{ data: Trade[] }`
 
 ### `GET /watchlist`

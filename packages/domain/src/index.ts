@@ -7,6 +7,8 @@ export type Position = {
 };
 
 export type TradeSide = "BUY" | "SELL";
+export type OrderType = "MARKET" | "LIMIT" | "STOP";
+export type OrderStatus = "PENDING" | "FILLED" | "PARTIALLY_FILLED" | "CANCELED" | "REJECTED" | "EXPIRED";
 export type Recommendation = "BUY" | "HOLD" | "AVOID";
 export type AnalysisAgentType =
   | "TECHNICAL_ANALYST"
@@ -243,6 +245,49 @@ export function applyTrade(
 
   const realizedPnlDelta = (price - existing.averageCost) * quantity;
   return { cash: cash + gross, positions: next, realizedPnlDelta };
+}
+
+export function isOrderTriggered(input: {
+  side: TradeSide;
+  orderType: OrderType;
+  currentPrice: number;
+  limitPrice?: number | null;
+  stopPrice?: number | null;
+}): boolean {
+  if (input.orderType === "MARKET") return true;
+  if (input.orderType === "LIMIT") {
+    if (!input.limitPrice) return false;
+    return input.side === "BUY" ? input.currentPrice <= input.limitPrice : input.currentPrice >= input.limitPrice;
+  }
+  if (!input.stopPrice) return false;
+  return input.side === "BUY" ? input.currentPrice >= input.stopPrice : input.currentPrice <= input.stopPrice;
+}
+
+export function canCancelOrder(status: OrderStatus): boolean {
+  return status === "PENDING" || status === "PARTIALLY_FILLED";
+}
+
+export function evaluateOrderFill(input: {
+  quantity: number;
+  filledQuantity: number;
+  availableQuantity?: number;
+  side: TradeSide;
+  orderType: OrderType;
+  currentPrice: number;
+  limitPrice?: number | null;
+  stopPrice?: number | null;
+}): { shouldFill: boolean; fillQuantity: number; nextStatus: OrderStatus } {
+  const remaining = Math.max(0, input.quantity - input.filledQuantity);
+  const shouldFill = remaining > 0 && isOrderTriggered(input);
+  if (!shouldFill) return { shouldFill: false, fillQuantity: 0, nextStatus: "PENDING" };
+
+  const fillQuantity = Math.min(remaining, Math.max(0, input.availableQuantity ?? remaining));
+  if (fillQuantity <= 0) return { shouldFill: false, fillQuantity: 0, nextStatus: "PENDING" };
+  return {
+    shouldFill: true,
+    fillQuantity,
+    nextStatus: input.filledQuantity + fillQuantity >= input.quantity ? "FILLED" : "PARTIALLY_FILLED"
+  };
 }
 
 export function aggregateRecommendation(
