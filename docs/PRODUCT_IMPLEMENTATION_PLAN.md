@@ -49,7 +49,7 @@ Most trading simulators feel either too dry (spreadsheet dashboards) or too gami
 - Portfolio Manager aggregation and final recommendation
 
 ### Portfolio Simulation
-- Single demo account with virtual cash
+- Browser-isolated simulation account with virtual cash
 - Buy/sell virtual shares
 - Holdings, average cost, realized/unrealized P&L
 - Trade history and recommendation history
@@ -144,7 +144,7 @@ Most trading simulators feel either too dry (spreadsheet dashboards) or too gami
 ## 6) Data Model
 
 ### Core Entities
-- `Account` (single demo account)
+- `Account` (browser-isolated simulation account)
 - `Position` (ticker, quantity, avgCost)
 - `Trade` (buy/sell fills, price, quantity, timestamps)
 - `WatchlistItem` (ticker, createdAt)
@@ -217,7 +217,7 @@ Most trading simulators feel either too dry (spreadsheet dashboards) or too gami
 ### Phase 1: Runtime Reliability
 - Deterministic setup paths (Docker + non-Docker)
 - Env validation + health checks
-- Seeded demo account + baseline data
+- Minimal account bootstrap with no seeded watchlist or recommendation data
 - Done means: cold start to running app in under 10 minutes
 
 ### Phase 2: Contract Integrity

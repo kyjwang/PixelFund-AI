@@ -3,7 +3,7 @@
 PixelFund AI uses a two-layer agent team:
 
 - **Analysis pipeline agents** are real backend agents. They run during `Run Analysis`, produce stored `AgentResult` records, and feed the final Portfolio Manager recommendation.
-- **Pixel-office specialist characters** are frontend/game UI agents. They make the trading floor easier to understand, add personality, and support mock terminal/team-meeting interactions.
+- **Pixel-office specialist characters** are frontend/game UI agents. They make the trading floor easier to understand and reflect backend analysis state when results are available.
 
 The project is an educational stock simulation. No agent places real trades or connects to a brokerage.
 
@@ -136,47 +136,13 @@ Clicking an office character opens that agent in the terminal. The terminal show
 - Current status
 - Current signal
 - Confidence score
-- Analysis paragraph
-- `Ask this agent`
-- `Pin insight`
+- Backend analysis paragraph, once an analysis run has produced output
 
-If the selected character maps to a backend analysis result, the terminal shows real backend output after analysis runs. If no backend result exists yet, it shows the designed mock personality and signal.
-
-### Ask This Agent
-
-When the user clicks `Ask this agent`:
-
-1. The selected character changes to `THINKING`.
-2. After a short timeout, the terminal updates with a mock analysis paragraph.
-3. The character status changes to `COMPLETED`.
-
-This is a UI interaction only. It does not change the backend recommendation.
-
-### Pin Insight
-
-`Pin insight` saves the current terminal insight into the Pinned Insights panel so the user can compare multiple agent comments.
+If no backend result exists yet, the terminal asks the user to run analysis instead of generating a local placeholder response.
 
 ### Team Meeting
 
-When the user starts a Team Meeting:
-
-1. Agents are activated one by one.
-2. Each character briefly changes to `THINKING`.
-3. The meeting log updates step by step.
-4. The Team Lead prepares the final summary.
-
-Example flow:
-
-- Technical Analyst is checking price action.
-- Fundamentals Analyst is reviewing valuation.
-- News Analyst is scanning headlines.
-- Risk Manager is checking downside risk.
-- Bull Researcher is building the upside case.
-- Bear Researcher is challenging the setup.
-- Trader Agent is converting debate into a trade plan.
-- Risk Council is reviewing the plan.
-- Portfolio Manager is checking allocation impact.
-- Team Lead is preparing the final summary.
+The Research page shows backend analysis progress and the completed team output. It does not create local placeholder meeting steps.
 
 ## Design Intent
 

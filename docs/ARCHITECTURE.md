@@ -7,7 +7,6 @@ pixelFund AI is a fullstack stock-trading simulation platform with a pixel-art U
 - Canonical frontend: `apps/web`
 - Canonical backend: `apps/api`
 - Canonical shared contracts/domain: `packages/*`
-- Legacy/non-canonical (kept temporarily): `client/`, `server/`
 
 ## High-Level System
 - Web: Next.js App Router (TypeScript, Tailwind) in `apps/web`
@@ -36,7 +35,7 @@ pixelFund AI is a fullstack stock-trading simulation platform with a pixel-art U
 9. User places virtual trade (`POST /trades`), backend updates cash/positions and emits `portfolio.updated`.
 
 ## Key Invariants
-- Single demo account for V1.
+- Browser-isolated simulation accounts remain scoped by `x-demo-user-id`.
 - Virtual-only trading; no live brokerage execution.
 - All public contracts should be validated via shared Zod schemas.
 - REST responses use envelope `{ data }` on success and `{ error }` on failure.

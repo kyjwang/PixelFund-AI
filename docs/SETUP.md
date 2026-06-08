@@ -16,8 +16,8 @@ cp .env.example .env
 Expected keys:
 - `DATABASE_URL`
 - `REDIS_URL`
-- `FINNHUB_API_KEY` (optional for demo fallback)
-- `OPENAI_API_KEY` (optional for demo fallback)
+- `FINNHUB_API_KEY` (optional; trading execution is disabled without live data)
+- `OPENAI_API_KEY` (optional; analysis output is unavailable without an AI provider)
 - `NEXT_PUBLIC_API_URL`
 - `NEXT_PUBLIC_WS_URL`
 - `QUOTE_POLL_MS`
@@ -32,7 +32,7 @@ npm run dev:all
 
 This performs:
 1. `infra:up` (Postgres + Redis)
-2. `db:setup` (Prisma generate + migrate + seed)
+2. `db:setup` (Prisma generate + migrate + minimal account bootstrap)
 3. `dev` (web + api)
 
 ### Verification Output
@@ -64,10 +64,10 @@ npm run dev
 - Stop infra: `npm run infra:down`
 - Stop + reset volumes: `npm run infra:down:volumes`
 - Regenerate Prisma client: `npm run db:generate`
-- Seed only: `npm run db:seed`
+- Bootstrap default account only: `npm run db:seed`
 
 ## Troubleshooting
 - `docker: command not found`: install Docker Desktop or use non-Docker path.
 - DB connection failures: verify `DATABASE_URL` and service availability.
 - Redis connection failures: verify `REDIS_URL` and Redis health.
-- Empty/failed AI output: app falls back to demo behavior when `OPENAI_API_KEY` is absent.
+- Empty/failed AI output: verify `OPENAI_API_KEY` or another configured AI provider.

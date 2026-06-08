@@ -51,8 +51,6 @@ export default function HomePage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>("TECHNICAL_ANALYST");
-  const [agentUiStatuses, setAgentUiStatuses] = useState<Record<string, string>>({});
-  const [agentDeskNotes, setAgentDeskNotes] = useState<Record<string, string>>({});
   const [quote, setQuote] = useState<Quote | null>(null);
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
   const [quoteStale, setQuoteStale] = useState(false);
@@ -253,14 +251,12 @@ export default function HomePage() {
   const agentStatuses = useMemo(() => {
     const map: Record<string, string | undefined> = {};
     for (const rec of latest?.recommendations ?? []) map[rec.agentType] = rec.status;
-    for (const [agentId, status] of Object.entries(agentUiStatuses)) map[agentId] = status;
     return map;
-  }, [latest, agentUiStatuses]);
+  }, [latest]);
 
   const agentRecommendations = useMemo(() => {
     const map: Record<string, string | undefined> = {};
     for (const rec of latest?.recommendations ?? []) map[rec.agentType] = rec.recommendation ?? undefined;
-    for (const agent of gameAgents) if (!map[agent.id]) map[agent.id] = agent.signal.includes("Risk") ? "HOLD" : undefined;
     return map;
   }, [latest]);
 
@@ -292,23 +288,6 @@ export default function HomePage() {
     }
   }
 
-  function askSelectedAgent() {
-    const agent = selectedGameAgent;
-    setHasAskedTeam(true);
-    setAchievement({ title: "Agent Consulted", detail: `${agent.name} prepared a role note.` });
-    window.setTimeout(() => setAchievement(null), 3200);
-    setAgentUiStatuses((statuses) => ({ ...statuses, [agent.id]: "THINKING" }));
-    window.setTimeout(() => {
-      const marketTone = quoteChangePositive ? "price action is constructive" : "price action is under pressure";
-      const qualityTone = dataQualityStatus === "LIVE" ? "live evidence" : `${dataQualityStatus.toLowerCase()} evidence`;
-      setAgentDeskNotes((analysis) => ({
-        ...analysis,
-        [agent.id]: `${agent.name}: ${agent.mockAnalysis} For ${ticker.toUpperCase()}, ${marketTone}, and I am weighting this against ${qualityTone}.`
-      }));
-      setAgentUiStatuses((statuses) => ({ ...statuses, [agent.id]: "COMPLETED" }));
-    }, 900);
-  }
-
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey) {
@@ -329,7 +308,6 @@ export default function HomePage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const quoteChangePositive = (quote?.changePercent ?? 0) >= 0;
   const finalRec = latest?.finalRec ?? portfolioManager?.recommendation ?? "PENDING";
   const dataQuality = marketContext?.dataQuality.score ?? 0;
   const dataQualityStatus = marketContext?.dataQuality.status ?? "DEMO";
@@ -346,8 +324,7 @@ export default function HomePage() {
   const agentAnalysisText =
     selected?.summary ??
     selectedExplanation?.summary ??
-    agentDeskNotes[selectedGameAgent.id] ??
-    "Run an analysis or ask this agent to see ticker-specific output here.";
+    "Run an analysis to load backend output for this agent.";
 
   return (
     <main className="min-h-[100dvh] text-slate-950" aria-label="pixelFund AI office desk">
@@ -479,8 +456,6 @@ export default function HomePage() {
             confidence={selected?.confidence ?? selectedExplanation?.confidence ?? null}
             text={agentAnalysisText}
             reasons={selected?.reasons ?? selectedExplanation?.reasons ?? []}
-            onAsk={askSelectedAgent}
-            disabled={terminalStatus === "THINKING" || terminalStatus === "RUNNING"}
           />
         </section>
 
@@ -556,9 +531,7 @@ function AnalysisOutput({
   recommendation,
   confidence,
   text,
-  reasons,
-  onAsk,
-  disabled
+  reasons
 }: {
   ticker: string;
   role: string;
@@ -567,14 +540,11 @@ function AnalysisOutput({
   confidence?: number | null;
   text: string;
   reasons: string[];
-  onAsk: () => void;
-  disabled: boolean;
 }) {
   return (
     <PixelCard
       title="Analysis Output"
       eyebrow={`${ticker} / ${role}`}
-      action={<PixelButton tone="good" onClick={onAsk} disabled={disabled}>Ask Agent</PixelButton>}
     >
       <div className="flex flex-wrap gap-2">
         <StatusBadge value={status.toLowerCase()} />

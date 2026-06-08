@@ -58,7 +58,7 @@ export default function BacktestPage() {
           </PixelButton>
         </div>
         <p className="mt-3 text-xs leading-5 text-slate-700">
-          Replays the Portfolio Manager style signal against historical closes using fake-money simulation data only.
+          Replays the Portfolio Manager style signal against historical closes using virtual-cash simulation data only.
         </p>
       </PixelCard>
 

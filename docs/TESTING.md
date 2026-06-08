@@ -36,7 +36,7 @@ npx playwright test
 ## Determinism Rules
 - Integration tests reset DB state before each test.
 - Integration tests run single-worker for reduced race/flakiness.
-- CI seeds data before integration and E2E runs.
+- CI bootstraps required database schema and creates test data inside each suite.
 
 ## Acceptance Targets
 - Contract regressions fail fast in CI.

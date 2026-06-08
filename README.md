@@ -62,7 +62,6 @@ npm run dev
 - Canonical frontend: `apps/web`
 - Canonical backend: `apps/api`
 - Canonical shared packages: `packages/*`
-- Non-canonical legacy folders (temporary): `client/`, `server/`
 
 ## Documentation Quality Standard
 - Public API and websocket contracts must reference shared schema source (`packages/schemas/src/index.ts`).

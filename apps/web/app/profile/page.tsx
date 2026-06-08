@@ -65,7 +65,7 @@ export default function ProfilePage() {
 
   return (
     <main className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-4 md:px-6">
-      <PixelCard title="Trader Profile" eyebrow="demo identity" className="bg-[#fff8e7]">
+      <PixelCard title="Trader Profile" eyebrow="local identity" className="bg-[#fff8e7]">
         <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
           <div className="grid justify-items-center gap-3">
             <div className="relative h-36 w-32 border-4 border-black bg-[#d9f0e8] shadow-[6px_6px_0_#111]" aria-label="Profile picture">
@@ -96,7 +96,7 @@ export default function ProfilePage() {
         </div>
       </PixelCard>
 
-      <PixelCard title="Edit Profile" eyebrow="local demo settings">
+      <PixelCard title="Edit Profile" eyebrow="simulation settings">
         <form className="grid gap-3" onSubmit={submit}>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="grid gap-1 text-xs font-black uppercase" htmlFor="profile-name">

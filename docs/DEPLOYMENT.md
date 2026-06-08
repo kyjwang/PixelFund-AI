@@ -6,7 +6,7 @@
 - Database: Neon free PostgreSQL
 - Queue/cache: Upstash Redis free tier
 
-This is a free-first demo topology. Expect cold starts, quota limits, and occasional websocket reconnects on free hosting.
+This is a free-first educational simulator topology. Expect cold starts, quota limits, and occasional websocket reconnects on free hosting.
 
 ## Environment Matrix
 ### Frontend
@@ -17,10 +17,10 @@ This is a free-first demo topology. Expect cold starts, quota limits, and occasi
 - `DATABASE_URL`
 - `REDIS_URL`
 - `PORT` (provided by Render; defaults to `4000` locally)
-- `FINNHUB_API_KEY` (optional; demo fallback when missing)
-- `OPENAI_API_KEY` (optional; demo fallback when missing)
-- `NVIDIA_API_KEY` (optional; demo fallback when missing)
-- `AI_PROVIDER` (optional; defaults can remain demo-oriented)
+- `FINNHUB_API_KEY` (optional; trading execution is disabled without live market data)
+- `OPENAI_API_KEY` (optional when another AI provider is configured)
+- `NVIDIA_API_KEY` (optional when another AI provider is configured)
+- `AI_PROVIDER` (optional; selects the analysis provider)
 - `NVIDIA_BASE_URL` (optional)
 - `NVIDIA_MODEL` (optional)
 - `QUOTE_POLL_MS`

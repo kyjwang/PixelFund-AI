@@ -11,4 +11,4 @@
 - Project documentation positioning for canonical monorepo paths (`apps/web`, `apps/api`, `packages/*`).
 
 ### Notes
-- Legacy `client/` and `server/` directories remain non-canonical and are retained temporarily.
+- Legacy `client/` and `server/` directories were removed after the monorepo apps became canonical.
