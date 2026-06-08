@@ -26,10 +26,11 @@ npm run dev
 ## Current Status
 ### Working now
 - Pixel office UI and mobile-responsive experience
-- Virtual buy/sell portfolio flow with market/limit/stop preview checks
-- Browser-isolated simulation accounts with scoped portfolio, watchlist, and trade history via `x-demo-user-id`
+- Browser-isolated simulation accounts with scoped portfolio, watchlist, orders, and fill history via `x-demo-user-id`
+- Durable order lifecycle with market, limit, stop, cancel, fill, and fail-closed live-data gating
 - Full investment committee lifecycle with specialist, debate, risk council, team lead, and manager outputs
 - Realtime websocket quote and lifecycle events
+- System Console for API/database/Redis/provider readiness
 - Trade sizing hints, richer P&L analytics, and recommendation explainability
 - Market-data cache fallback for degraded provider moments
 - Shared schema and domain packages
@@ -38,7 +39,7 @@ npm run dev
 ### Planned hardening
 - Expanded true integration tests against live DB/Redis in CI
 - Deeper observability/monitoring and deployment readiness
-- Production auth provider and durable pending-order simulation
+- Production auth provider and server-side user management
 - Continuous docs-to-code drift prevention improvements
 
 ## Documentation Index

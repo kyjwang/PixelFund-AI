@@ -137,6 +137,29 @@ export const providerCapabilitiesSchema = z.object({
   providers: z.array(providerCapabilitySchema)
 });
 
+export const systemComponentSchema = z.object({
+  name: z.string(),
+  status: z.enum(["OK", "DEGRADED", "DOWN"]),
+  message: z.string(),
+  checkedAt: z.string()
+});
+
+export const systemHealthSchema = z.object({
+  ok: z.boolean(),
+  status: z.enum(["OK", "DEGRADED", "DOWN"]),
+  service: z.literal("pixelfund-api"),
+  version: z.string(),
+  uptimeSeconds: z.number().nonnegative(),
+  checkedAt: z.string(),
+  components: z.object({
+    api: systemComponentSchema,
+    database: systemComponentSchema,
+    redis: systemComponentSchema,
+    marketData: systemComponentSchema,
+    ai: systemComponentSchema
+  })
+});
+
 export const historyRangeSchema = z.enum(["1d", "1mo", "6mo", "1y"]);
 export const stockHistorySchema = z.object({
   ticker: tickerSchema,
@@ -406,6 +429,7 @@ export type StockHistory = z.infer<typeof stockHistorySchema>;
 export type BacktestCreateInput = z.infer<typeof backtestCreateSchema>;
 export type BacktestResult = z.infer<typeof backtestResultSchema>;
 export type ProviderCapabilities = z.infer<typeof providerCapabilitiesSchema>;
+export type SystemHealth = z.infer<typeof systemHealthSchema>;
 export type Portfolio = z.infer<typeof portfolioSchema>;
 export type Trade = z.infer<typeof tradeSchema>;
 export type TradeCreateInput = z.infer<typeof tradeCreateSchema>;

@@ -23,10 +23,10 @@ function checkPort(host, port, label) {
 }
 
 async function checkApi() {
-  const res = await fetch(`${apiUrl}/portfolio`);
+  const res = await fetch(`${apiUrl}/health`);
   if (!res.ok) throw new Error("api:down");
   const body = await res.json();
-  if (!body?.data?.cash && body?.data?.cash !== 0) throw new Error("api:invalid");
+  if (!body?.data?.ok || !body?.data?.components?.database || !body?.data?.components?.redis) throw new Error("api:invalid");
   return "api:ok";
 }
 

@@ -13,7 +13,7 @@ const toneStyles: Record<Tone, string> = {
   good: "bg-emerald-200 text-emerald-950",
   bad: "bg-red-200 text-red-950",
   warn: "bg-amber-200 text-amber-950",
-  magic: "bg-[#7c3aed] text-white"
+  magic: "bg-[#0c7c59] text-white"
 };
 
 export function PixelCard({
@@ -30,12 +30,12 @@ export function PixelCard({
   action?: ReactNode;
 }) {
   return (
-    <section className={cx("pixel-panel relative overflow-hidden rounded-[6px] border-4 border-slate-950 bg-[#fffdf4] p-3 sm:p-4", className)}>
+    <section className={cx("pixel-panel relative overflow-hidden rounded-[8px] border-[3px] border-slate-950 bg-[#fffdf4] p-3 shadow-[5px_5px_0_#101827] sm:p-4", className)}>
       {(title || action) ? (
-        <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="mb-3 flex items-start justify-between gap-3 border-b-2 border-slate-950/15 pb-3">
           <div>
-            {eyebrow ? <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#7c3aed]">{eyebrow}</p> : null}
-            {title ? <h2 className="font-pixel text-[10px] leading-5 text-slate-950 sm:text-xs">{title}</h2> : null}
+            {eyebrow ? <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#0c7c59]">{eyebrow}</p> : null}
+            {title ? <h2 className="font-pixel text-[11px] leading-5 text-slate-950 sm:text-xs">{title}</h2> : null}
           </div>
           {action}
         </div>
@@ -68,7 +68,7 @@ export function PixelButton({
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        "pixel-button min-h-10 border-2 border-black px-3 py-2 text-xs font-black uppercase shadow-[4px_4px_0_#111] transition-transform hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#111] active:translate-x-1 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-slate-100",
+        "pixel-button min-h-10 rounded-[5px] border-2 border-black px-3 py-2 text-xs font-black uppercase shadow-[4px_4px_0_#101827] transition-transform hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#101827] active:translate-x-1 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-slate-100",
         toneStyles[tone],
         glow && "pixel-glow",
         className
@@ -79,9 +79,9 @@ export function PixelButton({
   );
 }
 
-export function StatusBadge({ value }: { value: string }) {
+export function StatusBadge({ value, tone: explicitTone }: { value: string; tone?: Tone }) {
   const normalized = value.toLowerCase();
-  const tone =
+  const inferredTone =
     normalized.includes("bull") || normalized === "buy" || normalized === "completed" || normalized === "live"
       ? "good"
       : normalized.includes("bear") || normalized === "avoid" || normalized === "failed" || normalized === "stale"
@@ -89,9 +89,10 @@ export function StatusBadge({ value }: { value: string }) {
         : normalized.includes("think") || normalized === "hold" || normalized === "pending"
           ? "warn"
           : "neutral";
+  const tone = explicitTone ?? inferredTone;
 
   return (
-    <span className={cx("inline-flex border-2 border-black px-2 py-1 text-[10px] font-black uppercase", toneStyles[tone])}>
+    <span className={cx("inline-flex rounded-[4px] border-2 border-black px-2 py-1 text-[10px] font-black uppercase shadow-[2px_2px_0_#101827]", toneStyles[tone])}>
       {value}
     </span>
   );
@@ -130,7 +131,7 @@ export function PortfolioHud({
   return (
     <div className="grid gap-2 text-xs sm:grid-cols-4 xl:grid-cols-8">
       {items.map((item) => (
-        <div key={item.label} className="hud-chip border-2 border-black bg-[#f7fff7] px-2 py-2 shadow-[3px_3px_0_#111]">
+        <div key={item.label} className="hud-chip rounded-[6px] border-2 border-black bg-[#f7fff7] px-2 py-2 shadow-[3px_3px_0_#101827]">
           <p className="text-[9px] font-bold uppercase text-slate-600">{item.label}</p>
           <p className="mt-1 truncate font-pixel text-[10px] text-slate-950">{item.value}</p>
         </div>
@@ -158,7 +159,7 @@ export function StatTile({
           : "text-slate-950";
 
   return (
-    <div className="border-2 border-black bg-[#f7fff7] px-2 py-2">
+    <div className="rounded-[5px] border-2 border-black bg-[#f7fff7] px-2 py-2">
       <p className="text-[10px] font-bold uppercase text-slate-500">{label}</p>
       <p className={`mt-1 truncate text-xs font-semibold ${toneClass}`}>{value}</p>
     </div>

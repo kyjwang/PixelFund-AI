@@ -42,6 +42,12 @@
 - Response: `{ data: Portfolio }`
 - Portfolio fields: `accountKey`, `cash`, `totalValue`, `totalPnl`, `totalPnlPercent`, `realizedPnl`, `totalUnrealizedPnl`, `positions[]`
 
+### `GET /health`
+- Purpose: fullstack readiness for API, database, Redis, market-data config, and AI-provider config
+- Response: `{ data: SystemHealth }`
+- Health fields: `ok`, `status`, `service`, `version`, `uptimeSeconds`, `checkedAt`, `components`
+- Component status values: `OK|DEGRADED|DOWN`
+
 ### `POST /orders/preview`
 - Purpose: validate simulator order intent before creation and report whether live market data is tradable
 - Header: optional `x-demo-user-id`

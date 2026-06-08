@@ -40,6 +40,10 @@ test.describe("desktop flow", () => {
     await expect(page.getByText("buying power", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /Buy/ })).toBeVisible();
 
+    await page.getByRole("link", { name: "System" }).click();
+    await expect(page.getByRole("heading", { name: "System Console" })).toBeVisible();
+    await expect(page.getByText("Stack Components")).toBeVisible();
+
     await page.getByRole("link", { name: "Profile" }).click();
     await expect(page.getByRole("heading", { name: "Trader Profile" })).toBeVisible();
     await page.getByLabel("Name").fill("Pixel Pilot");

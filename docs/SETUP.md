@@ -39,8 +39,12 @@ This performs:
 Expected logs include:
 - `Connected to PostgreSQL`
 - `Connected to Redis`
-- `API listening on http://localhost:4000`
+- `API listening on port 4000`
 - Next dev server on `http://localhost:3000`
+
+Open the app and visit:
+- `http://localhost:3000/system` for fullstack readiness
+- `http://localhost:4000/health` for the raw API readiness payload
 
 ## Path B: Non-Docker
 Ensure local services are available:

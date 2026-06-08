@@ -4,37 +4,50 @@
 
 :root {
   --font-pixel: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --pf-ink: #101827;
+  --pf-paper: #fffdf4;
+  --pf-mint: #dff7ee;
+  --pf-sky: #b8f3ff;
+  --pf-gold: #f4d06f;
+  --pf-accent: #0c7c59;
+  --pf-shadow: #101827;
 }
 
 body {
-  @apply bg-[#c7e9e4] text-slate-900;
+  @apply bg-[#c7e9e4] text-slate-900 antialiased;
   background:
-    linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
-    linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
-    radial-gradient(circle at 18% 12%, #f4d06f 0 12%, transparent 12%),
-    linear-gradient(180deg, #b8f3ff 0%, #edf6f9 42%, #d9f0e8 100%);
-  background-size: 18px 18px, 18px 18px, auto, auto;
+    linear-gradient(90deg, rgba(16, 24, 39, 0.045) 1px, transparent 1px),
+    linear-gradient(rgba(16, 24, 39, 0.045) 1px, transparent 1px),
+    linear-gradient(180deg, #b8f3ff 0%, #edf6f9 44%, #dff7ee 100%);
+  background-attachment: fixed;
+  background-size: 20px 20px, 20px 20px, auto;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(12, 124, 89, 0.14), transparent 34%),
+    linear-gradient(315deg, rgba(244, 208, 111, 0.24), transparent 38%);
+}
+
+::selection {
+  background: #0c7c59;
+  color: #fffdf4;
 }
 
 .pixel-card {
   image-rendering: pixelated;
-  box-shadow: 0 0 0 2px #111, 6px 6px 0 #111;
+  box-shadow: 0 0 0 2px var(--pf-shadow), 6px 6px 0 var(--pf-shadow);
 }
 
 .pixel-panel,
 .pixel-button,
 .hud-chip {
   image-rendering: pixelated;
-}
-
-.pixel-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(90deg, rgba(255,255,255,0.42), transparent 32%),
-    linear-gradient(180deg, rgba(255,255,255,0.36), transparent 44%);
 }
 
 .pixel-button {

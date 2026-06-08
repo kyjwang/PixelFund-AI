@@ -350,12 +350,12 @@ export default function HomePage() {
     "Run an analysis or ask this agent to see ticker-specific output here.";
 
   return (
-    <main className="min-h-screen text-slate-950" aria-label="pixelFund AI office desk">
+    <main className="min-h-[100dvh] text-slate-950" aria-label="pixelFund AI office desk">
       <AchievementToast show={Boolean(achievement)} title={achievement?.title ?? ""} detail={achievement?.detail ?? ""} />
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-3 pb-28 pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-5">
+      <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-3 pb-28 pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-5">
         <header className="grid gap-4">
           <PixelCard className="bg-[#fff8e7]">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="font-pixel text-lg leading-8 md:text-2xl">AI Office</h1>
@@ -370,7 +370,7 @@ export default function HomePage() {
               </div>
               <Link
                 href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`}
-                className="pixel-button border-2 border-black bg-[#7c3aed] px-3 py-2 text-center text-xs font-black uppercase text-white shadow-[4px_4px_0_#111] transition-transform hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#111] active:translate-x-1 active:translate-y-1 active:shadow-none"
+                className="pixel-button rounded-[5px] border-2 border-black bg-[#0c7c59] px-3 py-2 text-center text-xs font-black uppercase text-white shadow-[4px_4px_0_#101827] transition-transform hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#101827] active:translate-x-1 active:translate-y-1 active:shadow-none"
               >
                 Open Trading
               </Link>
@@ -484,22 +484,23 @@ export default function HomePage() {
           />
         </section>
 
-        <section className="grid gap-3 md:grid-cols-4" aria-label="More rooms">
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5" aria-label="More rooms">
           <RoomLink href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Trading Terminal" detail="Live quote gate, account panels, watchlist, open orders, and fills." />
           <RoomLink href={`/research?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Research Room" detail="Agent debate, evidence, caveats, and team-meeting notes." />
           <RoomLink href="/history" title="History Vault" detail="Watchlist, recommendations, and account-scoped fill history." />
           <RoomLink href={`/backtest?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Backtest Lab" detail="Replay the manager signal against historical closes." />
+          <RoomLink href="/system" title="System Console" detail="API, database, Redis, provider, and runtime readiness." />
         </section>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t-4 border-black bg-white p-2 md:hidden" role="toolbar" aria-label="Office quick actions">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t-[3px] border-black bg-white p-2 md:hidden" role="toolbar" aria-label="Office quick actions">
         <div className="grid grid-cols-2 gap-2">
           <PixelButton tone="magic" glow className="px-1 text-[10px]" onClick={() => void runAnalysis()}>
             Analyze
           </PixelButton>
           <Link
             href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`}
-            className="pixel-button min-h-10 border-2 border-black bg-emerald-200 px-1 py-2 text-center text-[10px] font-black uppercase text-emerald-950 shadow-[4px_4px_0_#111]"
+            className="pixel-button min-h-10 rounded-[5px] border-2 border-black bg-emerald-200 px-1 py-2 text-center text-[10px] font-black uppercase text-emerald-950 shadow-[4px_4px_0_#101827]"
           >
             Trade
           </Link>
@@ -523,7 +524,7 @@ function AgentIntroduction({
   return (
     <PixelCard title="Agent Introduction" eyebrow={agent.role}>
       <div className="grid gap-3 sm:grid-cols-[96px_1fr]">
-        <div className="pixel-portrait mx-auto h-28 w-24 border-4 border-black bg-[#d9f0e8] shadow-[4px_4px_0_#111]" aria-hidden="true">
+        <div className="pixel-portrait mx-auto h-28 w-24 rounded-[6px] border-[3px] border-black bg-[#d9f0e8] shadow-[4px_4px_0_#101827]" aria-hidden="true">
           <span />
         </div>
         <div>
@@ -608,7 +609,7 @@ function RoomLink({ href, title, detail }: { href: string; title: string; detail
   return (
     <Link
       href={href}
-      className="pixel-panel rounded-[6px] border-4 border-black bg-[#fffdf4] p-3 shadow-[5px_5px_0_#111] transition-transform hover:-translate-y-1 hover:bg-[#f7fff7] active:translate-x-1 active:translate-y-1 active:shadow-none"
+      className="pixel-panel rounded-[8px] border-[3px] border-black bg-[#fffdf4] p-3 shadow-[5px_5px_0_#101827] transition-transform hover:-translate-y-1 hover:bg-[#f7fff7] active:translate-x-1 active:translate-y-1 active:shadow-none"
     >
       <p className="font-pixel text-[10px] leading-5 sm:text-xs">{title}</p>
       <p className="mt-2 text-xs leading-5 text-slate-700">{detail}</p>

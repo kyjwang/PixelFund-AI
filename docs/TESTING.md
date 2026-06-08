@@ -16,6 +16,7 @@ npx playwright test
 ```
 
 ## Integration Test Coverage
+- Health/readiness contract for API, database, Redis, market-data config, and AI-provider config
 - REST envelope invariants and error envelopes with `requestId`
 - Portfolio route contract and quote route schema validation
 - Trade flows: buy/sell accounting and insufficient funds path
@@ -29,6 +30,7 @@ npx playwright test
 ## E2E Coverage
 - `@smoke` desktop scenario for PRs
 - Full desktop + mobile flow for main/nightly
+- System Console route verifies visible fullstack readiness in manual smoke passes
 - Playwright config auto-starts API and web servers for deterministic CI runs
 
 ## Determinism Rules
