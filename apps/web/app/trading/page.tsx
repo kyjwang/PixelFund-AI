@@ -16,7 +16,7 @@ import {
   tradeSchema,
   watchlistItemSchema
 } from "@pixelfund/schemas";
-import { PixelButton, PixelCard, StatTile, StatusBadge } from "../../components/GameUI";
+import { PixelButton, PixelCard, StatTile, StatusBadge, cx } from "../../components/GameUI";
 import { api } from "../../lib/api";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
@@ -35,6 +35,9 @@ type WatchlistItem = z.infer<typeof watchlistItemSchema>;
 
 type Tab = "positions" | "orders" | "fills" | "analysis";
 type Range = "1d" | "1mo" | "6mo" | "1y";
+
+const softInputClass = "h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95";
+const compactInputClass = "h-11 rounded-[8px] border border-white/70 bg-white/70 px-2 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_10px_24px_rgba(15,23,42,0.07)] outline-none backdrop-blur focus:bg-white/95";
 
 export default function TradingPage() {
   const searchParams = useSearchParams();
@@ -297,22 +300,22 @@ export default function TradingPage() {
     <main className="mx-auto grid max-w-[1500px] gap-3 px-3 py-3 text-slate-950 sm:px-4 md:px-6">
       <section className="grid gap-3 xl:grid-cols-[320px_1fr_360px]">
         <div className="grid gap-3">
-          <PixelCard title="Markets" eyebrow={socketConnected ? "live terminal" : "reconnecting"} className="bg-[#fff8e7]">
+          <PixelCard title="Markets" eyebrow={socketConnected ? "live terminal" : "reconnecting"}>
             <label className="grid gap-1 text-xs font-black uppercase" htmlFor="trading-ticker">
               Symbol
               <input
                 id="trading-ticker"
                 value={ticker}
                 onChange={(event) => setTicker(event.target.value.toUpperCase())}
-                className="h-12 border-4 border-black bg-[#f7fff7] px-3 font-pixel text-sm"
+                className={softInputClass}
               />
             </label>
             {searchResults.length > 0 ? (
-              <div className="mt-2 grid gap-1 border-4 border-black bg-white p-2 shadow-[5px_5px_0_#111]">
+              <div className="glass-panel mt-2 grid gap-1 rounded-[8px] p-2">
                 {searchResults.map((item) => (
                   <button
                     key={item.symbol}
-                    className="grid grid-cols-[70px_1fr] gap-2 border-2 border-black px-2 py-2 text-left text-xs hover:bg-[#d9f0e8]"
+                    className="grid grid-cols-[70px_1fr] gap-2 rounded-[7px] px-2 py-2 text-left text-xs hover:bg-white/72"
                     onClick={() => void selectTicker(item.symbol)}
                   >
                     <span className="font-pixel text-[10px]">{item.symbol}</span>
@@ -334,7 +337,7 @@ export default function TradingPage() {
           <PixelCard title="Watchlist" eyebrow="account scoped">
             <div className="grid max-h-[280px] gap-2 overflow-auto pr-1">
               {watchlist.map((item) => (
-                <div key={item.id} className="grid grid-cols-[1fr_auto] gap-2 border-2 border-black bg-[#f7fff7] px-2 py-2 text-xs">
+                <div key={item.id} className="glass-chip grid grid-cols-[1fr_auto] gap-2 rounded-[8px] px-2.5 py-2 text-xs">
                   <button className="text-left font-pixel text-[10px]" onClick={() => void selectTicker(item.ticker)}>
                     {item.ticker}
                   </button>
@@ -364,7 +367,7 @@ export default function TradingPage() {
             <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="font-pixel text-lg leading-8">{normalizedTicker}</h1>
+                  <h1 className="text-3xl font-semibold leading-8 tracking-normal">{normalizedTicker}</h1>
                   <StatusBadge value={terminalTradable ? "tradable" : "not tradable"} />
                   <StatusBadge value={quoteStale ? "stale" : quote?.source ?? "loading"} />
                   <StatusBadge value={history?.dataQuality.status ?? "loading"} />
@@ -374,14 +377,14 @@ export default function TradingPage() {
                   {quote ? `${formatSignedPercent(quote.changePercent)} today | updated ${formatTime(quote.updatedAt)} | age ${formatAge(quoteAgeMs)}` : "Loading quote"}
                 </p>
               </div>
-              <Link href={`/?ticker=${encodeURIComponent(normalizedTicker)}`} className="pixel-button border-2 border-black bg-[#fff8e7] px-3 py-2 text-center text-xs font-black uppercase shadow-[4px_4px_0_#111]">
+              <Link href={`/?ticker=${encodeURIComponent(normalizedTicker)}`} className="pixel-button rounded-full border border-white/60 bg-white/62 px-3.5 py-2 text-center text-xs font-black uppercase text-slate-800 shadow-[0_12px_28px_rgba(15,23,42,0.1)] transition hover:-translate-y-0.5 hover:bg-white/82">
                 Desk
               </Link>
             </div>
             {orderPreview?.blockingReasons.length ? (
               <div className="mt-3 grid gap-1">
                 {orderPreview.blockingReasons.map((reason) => (
-                  <p key={reason} className="border-2 border-red-900 bg-red-100 px-2 py-1 text-xs font-semibold text-red-950">
+                  <p key={reason} className="rounded-[8px] border border-red-200/80 bg-red-100/85 px-2 py-1 text-xs font-semibold text-red-950">
                     {reason}
                   </p>
                 ))}
@@ -394,7 +397,7 @@ export default function TradingPage() {
               {(["1d", "1mo", "6mo", "1y"] as Range[]).map((nextRange) => (
                 <button
                   key={nextRange}
-                  className={`border-2 border-black px-2 py-1 text-xs font-black uppercase ${range === nextRange ? "bg-[#7c3aed] text-white" : "bg-white"}`}
+                  className={cx("rounded-full border px-2.5 py-1 text-xs font-black uppercase transition hover:-translate-y-0.5", range === nextRange ? "border-emerald-300/70 bg-[linear-gradient(135deg,#0f8f78,#2f6df6)] text-white shadow-[0_10px_24px_rgba(15,143,120,0.16)]" : "border-white/60 bg-white/56 text-slate-700 hover:bg-white/80")}
                   onClick={() => setRange(nextRange)}
                 >
                   {nextRange}
@@ -414,7 +417,7 @@ export default function TradingPage() {
               ] as Array<[Tab, string]>).map(([id, label]) => (
                 <button
                   key={id}
-                  className={`min-h-10 border-2 border-black px-1 text-[10px] font-black uppercase ${activeTab === id ? "bg-[#101827] text-white" : "bg-white"}`}
+                  className={cx("min-h-10 rounded-full border px-1 text-[10px] font-black uppercase transition hover:-translate-y-0.5", activeTab === id ? "border-slate-950/20 bg-slate-950 text-white" : "border-white/60 bg-white/56 text-slate-700 hover:bg-white/80")}
                   onClick={() => setActiveTab(id)}
                 >
                   {label}
@@ -429,7 +432,7 @@ export default function TradingPage() {
         </div>
 
         <div className="grid gap-3">
-          <PixelCard title="Order Ticket" eyebrow="live data required" className="bg-[#fff8e7]">
+          <PixelCard title="Order Ticket" eyebrow="live data required">
             <div className="grid grid-cols-2 gap-2">
               <PixelButton tone={previewSide === "BUY" ? "good" : "neutral"} onClick={() => setPreviewSide("BUY")}>
                 Buy
@@ -445,7 +448,7 @@ export default function TradingPage() {
                   id="order-type-input"
                   value={orderType}
                   onChange={(event) => setOrderType(event.target.value as "MARKET" | "LIMIT" | "STOP")}
-                  className="h-11 border-4 border-black bg-white px-2 text-sm"
+                  className={compactInputClass}
                 >
                   <option value="MARKET">Market</option>
                   <option value="LIMIT">Limit</option>
@@ -460,24 +463,24 @@ export default function TradingPage() {
                   min={1}
                   value={orderEstimate.qty}
                   onChange={(event) => setQuantity(Math.max(1, Number(event.target.value || "1")))}
-                  className="h-11 border-4 border-black bg-white px-2 text-sm"
+                  className={compactInputClass}
                 />
               </label>
               {orderType === "LIMIT" ? (
                 <label className="grid gap-1 text-xs font-black uppercase" htmlFor="limit-price-input">
                   Limit Price
-                  <input id="limit-price-input" type="number" min={0.01} step={0.01} value={limitPrice} placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"} onChange={(event) => setLimitPrice(event.target.value === "" ? "" : Number(event.target.value))} className="h-11 border-4 border-black bg-white px-2 text-sm" />
+                  <input id="limit-price-input" type="number" min={0.01} step={0.01} value={limitPrice} placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"} onChange={(event) => setLimitPrice(event.target.value === "" ? "" : Number(event.target.value))} className={compactInputClass} />
                 </label>
               ) : null}
               {orderType === "STOP" ? (
                 <label className="grid gap-1 text-xs font-black uppercase" htmlFor="stop-price-input">
                   Stop Price
-                  <input id="stop-price-input" type="number" min={0.01} step={0.01} value={stopPrice} placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"} onChange={(event) => setStopPrice(event.target.value === "" ? "" : Number(event.target.value))} className="h-11 border-4 border-black bg-white px-2 text-sm" />
+                  <input id="stop-price-input" type="number" min={0.01} step={0.01} value={stopPrice} placeholder={quote ? String(quote.price.toFixed(2)) : "0.00"} onChange={(event) => setStopPrice(event.target.value === "" ? "" : Number(event.target.value))} className={compactInputClass} />
                 </label>
               ) : null}
             </div>
 
-            <div className="mt-3 grid gap-1 border-2 border-black bg-white p-2 text-xs">
+            <div className="glass-chip mt-3 grid gap-1 rounded-[8px] p-2.5 text-xs">
               <p>Buying power: {formatMoney(portfolio?.cash ?? 0)}</p>
               <p>Held shares: {activePosition?.quantity ?? 0}</p>
               <p>Estimated cost/proceeds: {formatMoney(orderEstimate.gross)}</p>
@@ -493,7 +496,7 @@ export default function TradingPage() {
             {(orderPreview?.warnings ?? []).length > 0 ? (
               <div className="mt-3 grid gap-1">
                 {orderPreview?.warnings.map((warning) => (
-                  <p key={warning} className="border border-amber-900 bg-amber-100 px-2 py-1 text-xs text-amber-950">
+                  <p key={warning} className="rounded-[8px] border border-amber-200/80 bg-amber-100/85 px-2 py-1 text-xs text-amber-950">
                     {warning}
                   </p>
                 ))}
@@ -502,7 +505,7 @@ export default function TradingPage() {
             <PixelButton tone={previewSide === "BUY" ? "good" : "warn"} className="mt-3 w-full" onClick={() => void submitOrder()} disabled={!canSubmit}>
               {isSubmitting ? "Submitting" : orderType === "MARKET" ? `${previewSide} at Market` : `Place ${previewSide} ${orderType}`}
             </PixelButton>
-            {!terminalTradable ? <p className="mt-3 border-2 border-red-900 bg-red-100 p-2 text-xs font-semibold text-red-950">Order entry is disabled until quote and chart data are live and fresh.</p> : null}
+            {!terminalTradable ? <p className="mt-3 rounded-[8px] border border-red-200/80 bg-red-100/85 p-2 text-xs font-semibold text-red-950">Order entry is disabled until quote and chart data are live and fresh.</p> : null}
           </PixelCard>
 
           <PixelCard title="Open Risk" eyebrow="guardrails">
@@ -510,7 +513,7 @@ export default function TradingPage() {
               <StatTile label="Open Orders" value={`${openOrders.length}`} />
               <StatTile label="Selected Exposure" value={formatSignedPercent(activePosition?.portfolioWeight ?? 0)} />
               <StatTile label="Final Rec" value={finalRec} tone={finalRec === "BUY" ? "good" : finalRec === "AVOID" ? "bad" : "warn"} />
-              <p className="border-2 border-black bg-[#f7fff7] p-2 leading-5">
+              <p className="glass-chip rounded-[8px] p-2.5 leading-5">
                 {orderPreview?.sizingHint.message ?? "Preview an order to see buying power, exposure, trigger, and concentration checks."}
               </p>
             </div>
@@ -518,14 +521,14 @@ export default function TradingPage() {
         </div>
       </section>
 
-      {error ? <p className="rounded-[6px] border-4 border-red-900 bg-red-100 p-3 text-sm text-red-950 pixel-card">{error}</p> : null}
+      {error ? <p className="glass-panel rounded-[8px] border-red-200/80 bg-red-100/80 p-3 text-sm text-red-950">{error}</p> : null}
     </main>
   );
 }
 
 function PriceChart({ history }: { history: StockHistory | null }) {
   const candles = history?.candles ?? [];
-  if (candles.length === 0) return <div className="grid h-[320px] place-items-center border-2 border-black bg-white text-xs text-slate-600">No chart candles available.</div>;
+  if (candles.length === 0) return <div className="glass-chip grid h-[320px] place-items-center rounded-[8px] text-xs text-slate-600">No chart candles available.</div>;
 
   const width = 900;
   const height = 320;
@@ -542,7 +545,7 @@ function PriceChart({ history }: { history: StockHistory | null }) {
   const latest = candles.at(-1);
 
   return (
-    <div className="overflow-hidden border-2 border-black bg-[#101827]">
+    <div className="overflow-hidden rounded-[8px] border border-slate-950/10 bg-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-[320px] w-full" role="img" aria-label={`${history?.ticker ?? "Stock"} price chart`}>
         {[0, 1, 2, 3].map((line) => {
           const y = pad + line * ((height - pad * 2) / 3);
@@ -556,9 +559,9 @@ function PriceChart({ history }: { history: StockHistory | null }) {
 }
 
 function PositionsPanel({ positions, onSelect }: { positions: Portfolio["positions"]; onSelect: (ticker: string) => void }) {
-  if (positions.length === 0) return <p className="border-2 border-black bg-white p-3 text-xs text-slate-600">No positions yet.</p>;
+  if (positions.length === 0) return <p className="glass-chip rounded-[8px] p-3 text-xs text-slate-600">No positions yet.</p>;
   return (
-    <div className="max-h-[360px] overflow-auto border-2 border-black">
+    <div className="glass-chip max-h-[360px] overflow-auto rounded-[8px]">
       {positions.map((position) => (
         <div key={position.ticker} className="grid grid-cols-[70px_1fr_auto] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
           <button className="text-left font-pixel text-[10px]" onClick={() => onSelect(position.ticker)}>{position.ticker}</button>
@@ -571,15 +574,15 @@ function PositionsPanel({ positions, onSelect }: { positions: Portfolio["positio
 }
 
 function OrdersPanel({ orders, onCancel }: { orders: Order[]; onCancel: (id: string) => void }) {
-  if (orders.length === 0) return <p className="border-2 border-black bg-white p-3 text-xs text-slate-600">No open orders.</p>;
+  if (orders.length === 0) return <p className="glass-chip rounded-[8px] p-3 text-xs text-slate-600">No open orders.</p>;
   return (
-    <div className="max-h-[360px] overflow-auto border-2 border-black">
+    <div className="glass-chip max-h-[360px] overflow-auto rounded-[8px]">
       {orders.map((order) => (
         <div key={order.id} className="grid grid-cols-[54px_54px_1fr_auto] items-center gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
           <span className={order.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-red-800"}>{order.side}</span>
           <span>{order.ticker}</span>
           <span>{order.quantity - order.filledQuantity} open / {order.quantity} {order.orderType} {order.limitPrice ? `LMT ${formatMoney(order.limitPrice)}` : ""}{order.stopPrice ? `STP ${formatMoney(order.stopPrice)}` : ""}</span>
-          <button className="border-2 border-black bg-red-100 px-2 py-1 font-black text-red-900" onClick={() => onCancel(order.id)}>Cancel</button>
+          <button className="rounded-full border border-red-200/80 bg-red-100/85 px-2 py-1 font-black text-red-900" onClick={() => onCancel(order.id)}>Cancel</button>
         </div>
       ))}
     </div>
@@ -587,9 +590,9 @@ function OrdersPanel({ orders, onCancel }: { orders: Order[]; onCancel: (id: str
 }
 
 function FillsPanel({ trades }: { trades: Trade[] }) {
-  if (trades.length === 0) return <p className="border-2 border-black bg-white p-3 text-xs text-slate-600">No fills yet.</p>;
+  if (trades.length === 0) return <p className="glass-chip rounded-[8px] p-3 text-xs text-slate-600">No fills yet.</p>;
   return (
-    <div className="max-h-[360px] overflow-auto border-2 border-black">
+    <div className="glass-chip max-h-[360px] overflow-auto rounded-[8px]">
       {trades.map((trade) => (
         <div key={trade.id} className="grid grid-cols-[54px_60px_1fr_auto] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
           <span className={trade.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-red-800"}>{trade.side}</span>
@@ -606,9 +609,9 @@ function AnalysisPanel({ finalRec, portfolioManager, teamLead, explanation }: { 
   return (
     <div className="grid gap-2 text-xs">
       <StatusBadge value={`Final ${finalRec}`} />
-      <p className="border-2 border-black bg-[#f7fff7] p-2 leading-5">{portfolioManager ?? "No manager analysis exists for this ticker yet."}</p>
-      <p className="border-2 border-black bg-[#fff8e7] p-2 leading-5">{teamLead ?? "No team-lead summary exists for this ticker yet."}</p>
-      {explanation ? <p className="border-2 border-black bg-white p-2 font-semibold">Coverage {explanation.coverage.completed}/{explanation.coverage.total} | {explanation.voteMix.BUY} BUY | {explanation.voteMix.HOLD} HOLD | {explanation.voteMix.AVOID} AVOID</p> : null}
+      <p className="glass-chip rounded-[8px] p-2.5 leading-5">{portfolioManager ?? "No manager analysis exists for this ticker yet."}</p>
+      <p className="glass-chip rounded-[8px] p-2.5 leading-5">{teamLead ?? "No team-lead summary exists for this ticker yet."}</p>
+      {explanation ? <p className="glass-chip rounded-[8px] p-2.5 font-semibold">Coverage {explanation.coverage.completed}/{explanation.coverage.total} | {explanation.voteMix.BUY} BUY | {explanation.voteMix.HOLD} HOLD | {explanation.voteMix.AVOID} AVOID</p> : null}
     </div>
   );
 }

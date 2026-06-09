@@ -19,6 +19,7 @@ import {
 import {
   AchievementToast,
   AgentCard,
+  cx,
   MissionPanel,
   PixelButton,
   PixelCard,
@@ -331,15 +332,15 @@ export default function HomePage() {
       <AchievementToast show={Boolean(achievement)} title={achievement?.title ?? ""} detail={achievement?.detail ?? ""} />
       <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-3 pb-28 pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-5">
         <header className="grid gap-4">
-          <PixelCard className="bg-[#fff8e7]">
+          <PixelCard>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="font-pixel text-lg leading-8 md:text-2xl">AI Office</h1>
+                  <h1 className="text-2xl font-semibold leading-8 tracking-normal md:text-4xl">AI Office</h1>
                   <span className={badgeClass(finalRec)} aria-label={`Final recommendation ${finalRec}`}>
                     Final Rec: {finalRec}
                   </span>
-                  <span className={`border-2 border-slate-950 px-2 py-1 text-xs font-semibold ${socketConnected ? "bg-emerald-200" : "bg-red-200"}`}>
+                  <span className={cx("rounded-full border px-2.5 py-1 text-xs font-semibold", socketConnected ? "border-emerald-200/80 bg-emerald-100/80 text-emerald-950" : "border-red-200/80 bg-red-100/80 text-red-950")}>
                     {socketConnected ? "Live socket" : "Reconnecting"}
                   </span>
                 </div>
@@ -347,7 +348,7 @@ export default function HomePage() {
               </div>
               <Link
                 href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`}
-                className="pixel-button rounded-[5px] border-2 border-black bg-[#0c7c59] px-3 py-2 text-center text-xs font-black uppercase text-white shadow-[4px_4px_0_#101827] transition-transform hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#101827] active:translate-x-1 active:translate-y-1 active:shadow-none"
+                className="pixel-button rounded-full border border-emerald-300/60 bg-[linear-gradient(135deg,#0f8f78,#2f6df6)] px-3.5 py-2 text-center text-xs font-black uppercase text-white shadow-[0_14px_32px_rgba(15,143,120,0.18)] transition hover:-translate-y-0.5"
               >
                 Open Trading
               </Link>
@@ -380,7 +381,7 @@ export default function HomePage() {
         </header>
 
         {error ? (
-          <p className="rounded-[6px] border-4 border-red-900 bg-red-100 p-3 text-sm text-red-950 pixel-card">{error}</p>
+          <p className="glass-panel rounded-[8px] border-red-200/80 bg-red-100/80 p-3 text-sm text-red-950">{error}</p>
         ) : null}
 
         <section className="grid gap-4 lg:grid-cols-[1.45fr_0.85fr]" aria-label="AI office floor">
@@ -410,10 +411,10 @@ export default function HomePage() {
             <PixelCard title="Manager Summary" eyebrow="portfolio manager + team lead">
               <div className="grid gap-2 text-xs">
                 <StatusBadge value={`Final ${finalRec}`} />
-                <p className="border-2 border-black bg-[#f7fff7] p-2 leading-5">
+                <p className="glass-chip rounded-[8px] p-2.5 leading-5">
                   {portfolioManager?.summary ?? latest?.finalSummary ?? "Ask the AI team to receive the Portfolio Manager summary for this ticker."}
                 </p>
-                <p className="border-2 border-black bg-[#fff8e7] p-2 leading-5">
+                <p className="glass-chip rounded-[8px] p-2.5 leading-5">
                   {teamLead?.summary ?? "Team Lead will organize the committee's strongest points once the team has completed its review."}
                 </p>
               </div>
@@ -468,14 +469,14 @@ export default function HomePage() {
         </section>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t-[3px] border-black bg-white p-2 md:hidden" role="toolbar" aria-label="Office quick actions">
+      <div className="glass-panel fixed inset-x-2 bottom-2 z-30 rounded-[8px] p-2 md:hidden" role="toolbar" aria-label="Office quick actions">
         <div className="grid grid-cols-2 gap-2">
           <PixelButton tone="magic" glow className="px-1 text-[10px]" onClick={() => void runAnalysis()}>
             Analyze
           </PixelButton>
           <Link
             href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`}
-            className="pixel-button min-h-10 rounded-[5px] border-2 border-black bg-emerald-200 px-1 py-2 text-center text-[10px] font-black uppercase text-emerald-950 shadow-[4px_4px_0_#101827]"
+            className="pixel-button min-h-10 rounded-full border border-emerald-200/80 bg-emerald-100/80 px-1 py-2 text-center text-[10px] font-black uppercase text-emerald-950 shadow-[0_12px_26px_rgba(15,23,42,0.1)]"
           >
             Trade
           </Link>
@@ -499,7 +500,7 @@ function AgentIntroduction({
   return (
     <PixelCard title="Agent Introduction" eyebrow={agent.role}>
       <div className="grid gap-3 sm:grid-cols-[96px_1fr]">
-        <div className="pixel-portrait mx-auto h-28 w-24 rounded-[6px] border-[3px] border-black bg-[#d9f0e8] shadow-[4px_4px_0_#101827]" aria-hidden="true">
+        <div className="pixel-portrait glass-chip mx-auto h-28 w-24 rounded-[8px]" aria-hidden="true">
           <span />
         </div>
         <div>
@@ -509,7 +510,7 @@ function AgentIntroduction({
             <StatusBadge value={signal.toLowerCase()} />
             <StatusBadge value={`${confidence}% confidence`} />
           </div>
-          <blockquote className="mt-3 border-2 border-black bg-[#101827] p-3 font-mono text-xs leading-6 text-[#c7f9cc] shadow-inner">
+          <blockquote className="mt-3 rounded-[8px] border border-slate-950/10 bg-slate-950/90 p-3 font-mono text-xs leading-6 text-emerald-100 shadow-inner">
             "{introForAgent(agent.id)}"
           </blockquote>
           <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
@@ -551,12 +552,12 @@ function AnalysisOutput({
         {recommendation ? <StatusBadge value={recommendation.toLowerCase()} /> : null}
         {typeof confidence === "number" ? <StatusBadge value={`${Math.round(confidence * 100)}% confidence`} /> : null}
       </div>
-      <p className="mt-3 min-h-28 border-2 border-black bg-[#f7fff7] p-3 text-sm leading-6 text-slate-900">
+      <p className="mt-3 min-h-28 rounded-[8px] border border-white/60 bg-white/54 p-3 text-sm leading-6 text-slate-900">
         {text}
       </p>
       <div className="mt-3 grid gap-2">
         {reasons.length > 0 ? reasons.map((reason, idx) => <EvidenceReason key={`${ticker}-${idx}`} reason={reason} />) : (
-          <p className="border-2 border-black bg-[#fff8e7] p-2 text-xs leading-5 text-slate-700">
+          <p className="glass-chip rounded-[8px] p-2 text-xs leading-5 text-slate-700">
             Structured reasons appear here after the backend agent has completed analysis for this ticker.
           </p>
         )}
@@ -568,7 +569,7 @@ function AnalysisOutput({
 function Metric({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
   const toneClass = tone === "good" ? "text-emerald-800" : tone === "bad" ? "text-red-800" : "text-slate-950";
   return (
-    <div className="border-2 border-black bg-[#f7fff7] px-2 py-2">
+    <div className="glass-chip rounded-[8px] px-2.5 py-2">
       <p className="text-[10px] uppercase text-slate-500">{label}</p>
       <p className={`mt-1 truncate text-xs font-semibold ${toneClass}`}>{value}</p>
     </div>
@@ -579,9 +580,9 @@ function RoomLink({ href, title, detail }: { href: string; title: string; detail
   return (
     <Link
       href={href}
-      className="pixel-panel rounded-[8px] border-[3px] border-black bg-[#fffdf4] p-3 shadow-[5px_5px_0_#101827] transition-transform hover:-translate-y-1 hover:bg-[#f7fff7] active:translate-x-1 active:translate-y-1 active:shadow-none"
+      className="glass-panel pixel-panel rounded-[8px] p-3 transition hover:-translate-y-1 hover:bg-white/72"
     >
-      <p className="font-pixel text-[10px] leading-5 sm:text-xs">{title}</p>
+      <p className="text-sm font-semibold leading-5">{title}</p>
       <p className="mt-2 text-xs leading-5 text-slate-700">{detail}</p>
     </Link>
   );
@@ -590,8 +591,8 @@ function RoomLink({ href, title, detail }: { href: string; title: string; detail
 function EvidenceReason({ reason }: { reason: string }) {
   const match = reason.match(/^\[([^\]]+)\]\s*(.*)$/);
   return (
-    <p className="flex gap-2 border-2 border-black bg-[#f7fff7] px-2 py-2 text-xs leading-5">
-      {match ? <span className="h-fit border border-black bg-white px-1 text-[10px] font-semibold uppercase">{match[1]}</span> : null}
+    <p className="glass-chip flex gap-2 rounded-[8px] px-2 py-2 text-xs leading-5">
+      {match ? <span className="h-fit rounded-full border border-slate-950/10 bg-white/70 px-1.5 text-[10px] font-semibold uppercase">{match[1]}</span> : null}
       <span>{match ? match[2] : reason}</span>
     </p>
   );
@@ -637,11 +638,11 @@ function trustCueForAgent(agentId: string) {
 }
 
 function badgeClass(value: string) {
-  const base = "border-2 border-slate-950 px-2 py-1 text-xs font-semibold";
-  if (value === "BUY") return `${base} bg-emerald-200 text-emerald-950`;
-  if (value === "AVOID") return `${base} bg-red-200 text-red-950`;
-  if (value === "HOLD") return `${base} bg-amber-200 text-amber-950`;
-  return `${base} bg-slate-200 text-slate-950`;
+  const base = "rounded-full border px-2.5 py-1 text-xs font-semibold";
+  if (value === "BUY") return `${base} border-emerald-200/80 bg-emerald-100/80 text-emerald-950`;
+  if (value === "AVOID") return `${base} border-red-200/80 bg-red-100/80 text-red-950`;
+  if (value === "HOLD") return `${base} border-amber-200/80 bg-amber-100/80 text-amber-950`;
+  return `${base} border-white/60 bg-white/56 text-slate-700`;
 }
 
 function formatMoney(value: number) {

@@ -328,9 +328,9 @@ export const gameAgents: GameAgent[] = AGENT_PROFILES.map((profile) => {
 }).sort((a, b) => officeWorkflowOrder.indexOf(a.id) - officeWorkflowOrder.indexOf(b.id));
 
 const recommendationColor: Record<string, string> = {
-  BUY: "bg-emerald-300 text-slate-950",
-  HOLD: "bg-amber-200 text-slate-950",
-  AVOID: "bg-red-300 text-slate-950"
+  BUY: "border-emerald-300/70 bg-emerald-100/88 text-emerald-950",
+  HOLD: "border-amber-300/80 bg-amber-100/88 text-amber-950",
+  AVOID: "border-red-300/70 bg-red-100/88 text-red-950"
 };
 
 function visualState(status: string, recommendation?: string) {
@@ -342,11 +342,11 @@ function visualState(status: string, recommendation?: string) {
 }
 
 function stateClass(state: string, active: boolean) {
-  if (state === "thinking") return "bg-cyan-200 motion-safe:animate-pulse";
-  if (state === "failed") return "bg-red-200";
-  if (state === "bullish") return "bg-emerald-200";
-  if (state === "cautious") return "bg-amber-200";
-  return active ? "bg-white" : "bg-[#8bd3dd] hover:bg-[#b8f3ff]";
+  if (state === "thinking") return "border-sky-300/80 bg-sky-100/86 motion-safe:animate-pulse";
+  if (state === "failed") return "border-red-300/75 bg-red-100/86";
+  if (state === "bullish") return "border-emerald-300/75 bg-emerald-100/86";
+  if (state === "cautious") return "border-amber-300/80 bg-amber-100/86";
+  return active ? "border-emerald-300/80 bg-white/88" : "border-white/60 bg-white/55 hover:bg-white/82";
 }
 
 function propPixels(agent: GameAgent) {
@@ -415,38 +415,38 @@ export function PixelOffice({
   const selectedPerformance = agentPerformance?.[selected.id];
 
   return (
-    <div className="relative h-[620px] w-full overflow-hidden rounded-[8px] border-[3px] border-slate-950 bg-[#d9f0e8] pixel-card sm:h-[720px] lg:h-[660px]">
-      <div className="absolute inset-x-0 top-0 h-28 bg-[#8bd3dd]" />
-      <div className="absolute inset-x-0 top-28 h-24 bg-[#f4d06f]" />
-      <div className="absolute left-0 top-0 h-full w-20 bg-gradient-to-r from-white/25 to-transparent" />
-      <div className="absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-slate-950/10 to-transparent" />
-      <div className="absolute inset-x-0 top-0 h-full bg-[linear-gradient(90deg,rgba(15,23,42,0.08)_1px,transparent_1px),linear-gradient(rgba(15,23,42,0.08)_1px,transparent_1px)] bg-[length:24px_24px]" />
-      <div className="absolute left-[8%] top-8 h-20 w-[22%] border-[3px] border-black bg-[#dbeafe] shadow-[4px_4px_0_#101827]">
+    <div className="glass-panel pixel-card relative h-[620px] w-full overflow-hidden rounded-[8px] sm:h-[720px] lg:h-[660px]">
+      <div className="absolute inset-x-0 top-0 h-28 bg-sky-200/36" />
+      <div className="absolute inset-x-0 top-28 h-24 bg-amber-200/24" />
+      <div className="absolute left-0 top-0 h-full w-20 bg-gradient-to-r from-white/32 to-transparent" />
+      <div className="absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-slate-950/8 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-full bg-[linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[length:24px_24px]" />
+      <div className="absolute left-[8%] top-8 h-20 w-[22%] rounded-[8px] border border-white/60 bg-white/48 shadow-[0_16px_38px_rgba(15,23,42,0.1)] backdrop-blur">
         <span className="absolute left-2 top-2 h-8 w-[35%] border-2 border-black bg-[#f7fff7]" />
         <span className="absolute right-2 top-2 h-8 w-[35%] border-2 border-black bg-[#fef3c7]" />
         <span className="absolute bottom-2 left-2 h-3 w-[70%] border border-black bg-[#38bdf8]" />
       </div>
-      <div className="absolute left-[40%] top-8 h-20 w-[22%] border-[3px] border-black bg-[#e0f2fe] shadow-[4px_4px_0_#101827]">
+      <div className="absolute left-[40%] top-8 h-20 w-[22%] rounded-[8px] border border-white/60 bg-white/48 shadow-[0_16px_38px_rgba(15,23,42,0.1)] backdrop-blur">
         <span className="absolute left-3 top-3 h-4 w-4 border-2 border-black bg-[#22c55e]" />
         <span className="absolute left-10 top-3 h-4 w-4 border-2 border-black bg-[#facc15]" />
         <span className="absolute left-3 top-10 h-4 w-16 border-2 border-black bg-white" />
       </div>
-      <div className="absolute right-[7%] top-8 h-20 w-[22%] border-[3px] border-black bg-[#fff8e7] shadow-[4px_4px_0_#101827]">
+      <div className="absolute right-[7%] top-8 h-20 w-[22%] rounded-[8px] border border-white/60 bg-white/48 shadow-[0_16px_38px_rgba(15,23,42,0.1)] backdrop-blur">
         <span className="absolute left-3 top-3 h-4 w-[68%] border-2 border-black bg-[#ef4444]" />
         <span className="absolute left-3 top-9 h-4 w-[48%] border-2 border-black bg-[#22c55e]" />
         <span className="absolute left-3 top-[3.7rem] h-2 w-[76%] bg-black" />
       </div>
-      <div className="absolute bottom-0 h-52 w-full bg-[#5a3e34]" />
+      <div className="absolute bottom-0 h-52 w-full bg-[#81624e]" />
       <div className="absolute bottom-0 h-52 w-full bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[length:32px_28px]" />
-      <div className="absolute bottom-44 left-0 right-0 h-5 bg-[#2f4858]" />
-      <div className="absolute bottom-12 left-[8%] h-10 w-[84%] border-[3px] border-black bg-[#3d2b24] shadow-[6px_6px_0_#101827]" />
+      <div className="absolute bottom-44 left-0 right-0 h-5 bg-slate-700/75" />
+      <div className="absolute bottom-12 left-[8%] h-10 w-[84%] rounded-[8px] border border-slate-950/10 bg-[#4b372f] shadow-[0_18px_42px_rgba(15,23,42,0.22)]" />
 
-      <div className="absolute left-[4%] top-[15%] z-20 rounded-[4px] border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#101827] sm:text-[8px]">evidence desks</div>
-      <div className="absolute left-[32%] top-[39%] z-20 rounded-[4px] border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#101827] sm:text-[8px]">bull vs bear</div>
-      <div className="absolute left-[9%] top-[59%] z-20 rounded-[4px] border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#101827] sm:text-[8px]">execution + risk</div>
-      <div className="absolute right-[4%] bottom-[22%] z-20 rounded-[4px] border-2 border-black bg-white px-2 py-1 font-pixel text-[7px] shadow-[2px_2px_0_#101827] sm:text-[8px]">leadership</div>
+      <div className="glass-chip absolute left-[4%] top-[15%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">evidence desks</div>
+      <div className="glass-chip absolute left-[32%] top-[39%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">bull vs bear</div>
+      <div className="glass-chip absolute left-[9%] top-[59%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">execution + risk</div>
+      <div className="glass-chip absolute right-[4%] bottom-[22%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">leadership</div>
 
-      <div className="absolute left-[4%] top-[19%] h-16 w-[90%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
+      <div className="absolute left-[4%] top-[19%] h-16 w-[90%] rounded-[8px] border border-white/55 bg-white/46 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
       <div className="absolute left-[8%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#dbeafe]" />
       <div className="absolute left-[22%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#fef3c7]" />
       <div className="absolute left-[36%] top-[21%] h-7 w-[12%] border-2 border-black bg-white" />
@@ -454,19 +454,19 @@ export function PixelOffice({
       <div className="absolute left-[64%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#fbcfe8]" />
       <div className="absolute left-[78%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#052e16] shadow-[inset_0_0_0_4px_#22c55e]" />
 
-      <div className="absolute left-[30%] top-[42%] h-16 w-[24%] border-4 border-slate-950 bg-[#0f172a] shadow-[4px_4px_0_#111]" />
+      <div className="absolute left-[30%] top-[42%] h-16 w-[24%] rounded-[8px] border border-slate-950/20 bg-[#0f172a] shadow-[0_16px_36px_rgba(15,23,42,0.16)]" />
       <div className="absolute left-[36%] top-[43%] h-2 w-[4%] bg-[#22c55e]" />
       <div className="absolute left-[42%] top-[46%] h-2 w-[4%] bg-[#ef4444]" />
       <div className="absolute left-[46%] top-[43%] h-2 w-[4%] bg-[#facc15]" />
 
-      <div className="absolute left-[10%] top-[63%] h-16 w-[78%] border-4 border-slate-950 bg-[#f7fff7] shadow-[4px_4px_0_#111]" />
+      <div className="absolute left-[10%] top-[63%] h-16 w-[78%] rounded-[8px] border border-white/55 bg-white/46 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
       <div className="absolute left-[15%] top-[64%] h-8 w-10 border-2 border-black bg-[#fef3c7] shadow-[inset_0_-6px_0_#14b8a6]" />
       <div className="absolute left-[41%] top-[64%] h-8 w-10 border-2 border-black bg-[#fed7aa]" />
       <div className="absolute left-[55%] top-[64%] h-8 w-10 border-2 border-black bg-[#fecaca]" />
       <div className="absolute left-[69%] top-[64%] h-8 w-10 border-2 border-black bg-[#e2e8f0]" />
       <div className="absolute left-[82%] top-[64%] h-8 w-10 border-2 border-black bg-[#fef08a]" />
 
-      <div className="absolute right-[6%] bottom-[13%] h-20 w-[24%] border-4 border-slate-950 bg-[#fff8e7] shadow-[4px_4px_0_#111]" />
+      <div className="absolute right-[6%] bottom-[13%] h-20 w-[24%] rounded-[8px] border border-white/55 bg-white/48 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
       <div className="absolute right-[10%] bottom-[22%] h-8 w-[15%] border-2 border-black bg-white shadow-[inset_0_-6px_0_#cbd5e1]" />
       <div className="absolute left-[4%] bottom-[18%] h-20 w-12 border-4 border-black bg-[#8b5e34] shadow-[3px_3px_0_#111]">
         <span className="absolute left-1 top-2 h-3 w-8 border border-black bg-[#fef3c7]" />
@@ -486,9 +486,9 @@ export function PixelOffice({
         <span className="absolute left-5 top-2 h-4 w-3 bg-[#6b3f2a]" />
       </div>
       <div className="absolute inset-x-0 top-3 flex justify-center px-2">
-        <div className="max-w-full rounded-[5px] border-2 border-black bg-white px-3 py-2 text-center shadow-[3px_3px_0_#101827]">
+        <div className="glass-chip max-w-full rounded-full px-3 py-2 text-center">
           <p className="truncate font-pixel text-[10px] text-slate-900 sm:text-xs">{selected.name}</p>
-          <p className="mt-1 truncate text-[9px] font-black uppercase text-[#0c7c59]">{selected.role} / {selectedStatus}</p>
+          <p className="mt-1 truncate text-[9px] font-black uppercase text-[color:var(--pf-accent)]">{selected.role} / {selectedStatus}</p>
         </div>
       </div>
 
@@ -502,7 +502,7 @@ export function PixelOffice({
           <button
             key={agent.id}
             onClick={() => onSelect(agent.id)}
-            className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-[5px] border-[3px] border-black font-pixel text-[7px] leading-none shadow-[4px_4px_0_#101827] motion-safe:transition-all hover:-translate-y-[53%] hover:brightness-105 hover:shadow-[5px_5px_0_#101827] motion-safe:active:scale-95 sm:text-[8px] ${active ? "ring-4 ring-[#f4d06f]" : ""} ${stateClass(state, active)} h-[116px] w-[76px] sm:h-[122px] sm:w-[82px]`}
+            className={`absolute h-[116px] w-[76px] -translate-x-1/2 -translate-y-1/2 rounded-[8px] border font-pixel text-[7px] leading-none shadow-[0_14px_30px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.66)] backdrop-blur motion-safe:transition-all hover:-translate-y-[53%] hover:brightness-105 motion-safe:active:scale-95 sm:h-[122px] sm:w-[82px] sm:text-[8px] ${active ? "ring-2 ring-[color:var(--pf-accent)]" : ""} ${stateClass(state, active)}`}
             style={{ left: agent.x, top: agent.y }}
             title={`${agent.role} (${agentStatus})`}
             aria-label={agent.role}
@@ -514,7 +514,7 @@ export function PixelOffice({
             </div>
             <span className="mx-auto mt-0.5 block max-w-[68px] truncate text-[6px] uppercase">{state}</span>
             {rec ? (
-              <span className={`mx-auto mt-1 block max-w-[56px] truncate border border-black px-1 py-0.5 text-[7px] ${recommendationColor[rec] ?? "bg-white"}`}>
+              <span className={`mx-auto mt-1 block max-w-[56px] truncate rounded-full border px-1 py-0.5 text-[7px] ${recommendationColor[rec] ?? "border-white/60 bg-white/80"}`}>
                 {rec}
               </span>
             ) : null}
@@ -523,7 +523,7 @@ export function PixelOffice({
       })}
 
       {selectedPerformance ? (
-        <div className="absolute bottom-4 left-4 right-4 border-2 border-black bg-white/95 p-2 text-[9px] text-slate-900">
+        <div className="glass-chip absolute bottom-4 left-4 right-4 rounded-[8px] p-2 text-[9px] text-slate-900">
           <div className="grid grid-cols-3 gap-2">
             <span className="font-pixel">{selected.label}</span>
             <span>Hit {selectedPerformance.hitRate.toFixed(0)}%</span>

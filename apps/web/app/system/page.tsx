@@ -45,15 +45,15 @@ export default function SystemPage() {
 
   return (
     <main className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 md:px-6">
-      <PixelCard title="System Console" eyebrow="fullstack readiness" className="bg-[#fff8e7]">
+      <PixelCard title="System Console" eyebrow="fullstack readiness">
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge value={health?.status ?? "LOADING"} tone={health?.status === "OK" ? "good" : health?.status === "DOWN" ? "bad" : undefined} />
-              <span className="border-2 border-black bg-white px-2 py-1 text-xs font-bold shadow-[2px_2px_0_#111]">
+              <span className="glass-chip rounded-full px-2.5 py-1 text-xs font-bold">
                 {readyCount}/{checkOrder.length} ready
               </span>
-              <span className="border-2 border-black bg-white px-2 py-1 text-xs font-bold shadow-[2px_2px_0_#111]">
+              <span className="glass-chip rounded-full px-2.5 py-1 text-xs font-bold">
                 API uptime {health ? formatDuration(health.uptimeSeconds) : "--"}
               </span>
             </div>
@@ -67,7 +67,7 @@ export default function SystemPage() {
         </div>
       </PixelCard>
 
-      {error ? <p className="rounded-[6px] border-4 border-red-900 bg-red-100 p-3 text-sm text-red-950 pixel-card">{error}</p> : null}
+      {error ? <p className="glass-panel rounded-[8px] border-red-200/80 bg-red-100/80 p-3 text-sm text-red-950">{error}</p> : null}
 
       <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
         <PixelCard title="Stack Components" eyebrow="api / data / providers">
@@ -75,7 +75,7 @@ export default function SystemPage() {
             {checkOrder.map((key) => {
               const item = health?.components[key];
               return (
-                <div key={key} className="grid gap-2 border-2 border-black bg-[#f7fff7] p-3 sm:grid-cols-[140px_110px_1fr] sm:items-center">
+                <div key={key} className="glass-chip grid gap-2 rounded-[8px] p-3 sm:grid-cols-[140px_110px_1fr] sm:items-center">
                   <p className="font-pixel text-[10px] uppercase">{labelFor(key)}</p>
                   <StatusBadge value={item?.status ?? "LOADING"} tone={item?.status === "OK" ? "good" : item?.status === "DOWN" ? "bad" : undefined} />
                   <p className="text-xs leading-5 text-slate-700">{item?.message ?? "Waiting for backend response."}</p>
@@ -99,7 +99,7 @@ export default function SystemPage() {
       <PixelCard title="Market Providers" eyebrow="capabilities">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {(providers?.providers ?? []).map((provider) => (
-            <div key={provider.name} className="border-2 border-black bg-white p-3 shadow-[3px_3px_0_#111]">
+            <div key={provider.name} className="glass-chip rounded-[8px] p-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-pixel text-[10px] uppercase">{provider.name}</p>
@@ -113,10 +113,10 @@ export default function SystemPage() {
                 <Capability label="News" value={provider.supportsNews} />
                 <Capability label="Search" value={provider.supportsSearch} />
               </div>
-              {provider.notes.length ? <p className="mt-3 border-2 border-black bg-[#fff8e7] p-2 text-xs leading-5">{provider.notes[0]}</p> : null}
+              {provider.notes.length ? <p className="mt-3 rounded-[8px] border border-white/60 bg-white/54 p-2 text-xs leading-5">{provider.notes[0]}</p> : null}
             </div>
           ))}
-          {!providers?.providers.length ? <p className="border-2 border-black bg-white p-3 text-xs text-slate-600">Provider capability data is loading.</p> : null}
+          {!providers?.providers.length ? <p className="glass-chip rounded-[8px] p-3 text-xs text-slate-600">Provider capability data is loading.</p> : null}
         </div>
       </PixelCard>
     </main>
@@ -125,8 +125,8 @@ export default function SystemPage() {
 
 function CheckLine({ label, done, detail }: { label: string; done: boolean; detail: string }) {
   return (
-    <div className="grid grid-cols-[18px_110px_1fr] gap-2 border-2 border-black bg-white p-2">
-      <span className={`mt-0.5 h-3 w-3 border-2 border-black ${done ? "bg-emerald-300" : "bg-amber-200"}`} aria-hidden="true" />
+    <div className="glass-chip grid grid-cols-[18px_110px_1fr] gap-2 rounded-[8px] p-2">
+      <span className={`mt-0.5 h-3 w-3 rounded-full ${done ? "bg-emerald-400" : "bg-amber-300"}`} aria-hidden="true" />
       <span className="font-black uppercase">{label}</span>
       <span className="text-slate-700">{detail}</span>
     </div>
@@ -134,7 +134,7 @@ function CheckLine({ label, done, detail }: { label: string; done: boolean; deta
 }
 
 function Capability({ label, value }: { label: string; value: boolean }) {
-  return <span className={`border border-black px-2 py-1 ${value ? "bg-emerald-100 text-emerald-950" : "bg-slate-100 text-slate-500"}`}>{label}</span>;
+  return <span className={`rounded-full border px-2 py-1 ${value ? "border-emerald-200/80 bg-emerald-100/80 text-emerald-950" : "border-slate-200 bg-slate-100/70 text-slate-500"}`}>{label}</span>;
 }
 
 function labelFor(key: (typeof checkOrder)[number]) {

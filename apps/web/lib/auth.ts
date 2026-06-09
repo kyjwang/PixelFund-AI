@@ -34,7 +34,7 @@ export function setDemoUser(name: string) {
     id: existingId ?? `demo-${crypto.randomUUID()}`,
     name: cleanName,
     title: existing?.title ?? "Demo Portfolio Captain",
-    avatarColor: existing?.avatarColor ?? "#7c3aed",
+    avatarColor: existing?.avatarColor ?? "#0f8f78",
     preferredTicker: existing?.preferredTicker ?? "AAPL",
     createdAt: new Date().toISOString()
   };
@@ -52,7 +52,7 @@ export function updateDemoUser(update: Partial<Pick<DemoUser, "name" | "title" |
     id: existing?.id ?? window.localStorage.getItem(DEMO_USER_ID_KEY) ?? `demo-${crypto.randomUUID()}`,
     name: update.name?.trim() || existing?.name || "Pixel Trader",
     title: update.title?.trim() || existing?.title || "Demo Portfolio Captain",
-    avatarColor: update.avatarColor || existing?.avatarColor || "#7c3aed",
+    avatarColor: update.avatarColor || existing?.avatarColor || "#0f8f78",
     preferredTicker: update.preferredTicker?.trim().toUpperCase() || existing?.preferredTicker || "AAPL",
     createdAt: existing?.createdAt ?? new Date().toISOString()
   };

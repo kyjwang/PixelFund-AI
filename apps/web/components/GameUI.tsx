@@ -4,16 +4,16 @@ import type { ReactNode } from "react";
 
 type Tone = "neutral" | "good" | "bad" | "warn" | "magic";
 
-function cx(...classes: Array<string | false | null | undefined>) {
+export function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
 const toneStyles: Record<Tone, string> = {
-  neutral: "bg-[#fff8e7] text-slate-950",
-  good: "bg-emerald-200 text-emerald-950",
-  bad: "bg-red-200 text-red-950",
-  warn: "bg-amber-200 text-amber-950",
-  magic: "bg-[#0c7c59] text-white"
+  neutral: "border-white/60 bg-white/68 text-slate-950 hover:bg-white/85",
+  good: "border-emerald-200/70 bg-emerald-100/72 text-emerald-950 hover:bg-emerald-100",
+  bad: "border-red-200/75 bg-red-100/78 text-red-950 hover:bg-red-100",
+  warn: "border-amber-200/80 bg-amber-100/76 text-amber-950 hover:bg-amber-100",
+  magic: "border-emerald-300/60 bg-[linear-gradient(135deg,#0f8f78,#2f6df6)] text-white hover:brightness-105"
 };
 
 export function PixelCard({
@@ -30,12 +30,12 @@ export function PixelCard({
   action?: ReactNode;
 }) {
   return (
-    <section className={cx("pixel-panel relative overflow-hidden rounded-[8px] border-[3px] border-slate-950 bg-[#fffdf4] p-3 shadow-[5px_5px_0_#101827] sm:p-4", className)}>
+    <section className={cx("pixel-panel glass-panel relative overflow-hidden rounded-[8px] p-3 sm:p-4", className)}>
       {(title || action) ? (
-        <div className="mb-3 flex items-start justify-between gap-3 border-b-2 border-slate-950/15 pb-3">
+        <div className="mb-3 flex items-start justify-between gap-3 border-b border-white/55 pb-3">
           <div>
-            {eyebrow ? <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#0c7c59]">{eyebrow}</p> : null}
-            {title ? <h2 className="font-pixel text-[11px] leading-5 text-slate-950 sm:text-xs">{title}</h2> : null}
+            {eyebrow ? <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[color:var(--pf-accent)]">{eyebrow}</p> : null}
+            {title ? <h2 className="text-sm font-semibold leading-5 tracking-normal text-slate-950 sm:text-[15px]">{title}</h2> : null}
           </div>
           {action}
         </div>
@@ -68,7 +68,7 @@ export function PixelButton({
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        "pixel-button min-h-10 rounded-[5px] border-2 border-black px-3 py-2 text-xs font-black uppercase shadow-[4px_4px_0_#101827] transition-transform hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#101827] active:translate-x-1 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-slate-100",
+        "pixel-button min-h-10 rounded-full border px-3.5 py-2 text-xs font-black uppercase shadow-[0_12px_28px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.55)] backdrop-blur transition hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200/70 disabled:text-slate-400 disabled:shadow-none",
         toneStyles[tone],
         glow && "pixel-glow",
         className
@@ -92,7 +92,7 @@ export function StatusBadge({ value, tone: explicitTone }: { value: string; tone
   const tone = explicitTone ?? inferredTone;
 
   return (
-    <span className={cx("inline-flex rounded-[4px] border-2 border-black px-2 py-1 text-[10px] font-black uppercase shadow-[2px_2px_0_#101827]", toneStyles[tone])}>
+    <span className={cx("inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] backdrop-blur", toneStyles[tone])}>
       {value}
     </span>
   );
@@ -131,8 +131,8 @@ export function PortfolioHud({
   return (
     <div className="grid gap-2 text-xs sm:grid-cols-4 xl:grid-cols-8">
       {items.map((item) => (
-        <div key={item.label} className="hud-chip rounded-[6px] border-2 border-black bg-[#f7fff7] px-2 py-2 shadow-[3px_3px_0_#101827]">
-          <p className="text-[9px] font-bold uppercase text-slate-600">{item.label}</p>
+        <div key={item.label} className="hud-chip glass-chip rounded-[8px] px-2.5 py-2">
+          <p className="text-[9px] font-bold uppercase text-slate-500">{item.label}</p>
           <p className="mt-1 truncate font-pixel text-[10px] text-slate-950">{item.value}</p>
         </div>
       ))}
@@ -159,7 +159,7 @@ export function StatTile({
           : "text-slate-950";
 
   return (
-    <div className="rounded-[5px] border-2 border-black bg-[#f7fff7] px-2 py-2">
+    <div className="glass-chip rounded-[8px] px-2.5 py-2">
       <p className="text-[10px] font-bold uppercase text-slate-500">{label}</p>
       <p className={`mt-1 truncate text-xs font-semibold ${toneClass}`}>{value}</p>
     </div>
@@ -186,8 +186,8 @@ export function AgentCard({
       type="button"
       onClick={onSelect}
       className={cx(
-        "grid min-h-[74px] grid-cols-[1fr_auto] gap-2 border-2 border-black bg-white p-2 text-left text-xs shadow-[3px_3px_0_#111] transition-transform hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-none",
-        selected && "bg-[#fef3c7]"
+        "glass-chip grid min-h-[74px] grid-cols-[1fr_auto] gap-2 rounded-[8px] p-2.5 text-left text-xs transition hover:-translate-y-0.5 hover:bg-white/82",
+        selected && "ring-2 ring-[color:var(--pf-accent)]"
       )}
     >
       <div className="min-w-0">
@@ -222,7 +222,7 @@ export function DialogueBox({
   return (
     <PixelCard title="Agent Dialogue" eyebrow={role}>
       <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
-        <div className="pixel-portrait mx-auto h-28 w-24 border-4 border-black bg-[#d9f0e8] shadow-[4px_4px_0_#111]" aria-hidden="true">
+        <div className="pixel-portrait glass-chip mx-auto h-28 w-24 rounded-[8px]" aria-hidden="true">
           <span />
         </div>
         <div>
@@ -232,7 +232,7 @@ export function DialogueBox({
             <StatusBadge value={signal} />
             <StatusBadge value={confidence} />
           </div>
-          <p className="mt-3 min-h-28 border-2 border-black bg-[#101827] p-3 font-mono text-xs leading-6 text-[#c7f9cc] shadow-inner">
+          <p className="mt-3 min-h-28 rounded-[8px] border border-slate-950/10 bg-slate-950/90 p-3 font-mono text-xs leading-6 text-emerald-100 shadow-inner">
             {text}
           </p>
           {children ? <div className="mt-3">{children}</div> : null}
@@ -261,13 +261,13 @@ export function MissionPanel({
     <PixelCard title="Daily Missions" eyebrow="quest log">
       <div className="grid gap-2">
         {missions.map((mission) => (
-          <div key={mission.label} className="border-2 border-black bg-[#f7fff7] p-2 text-xs">
+          <div key={mission.label} className="glass-chip rounded-[8px] p-2.5 text-xs">
             <div className="flex items-center justify-between gap-2">
               <p className="font-bold">{mission.label}</p>
               <p className="font-pixel text-[10px]">{mission.done}/{mission.total}</p>
             </div>
-            <div className="mt-2 h-3 border-2 border-black bg-white">
-              <div className="h-full bg-[#0c7c59]" style={{ width: `${(mission.done / mission.total) * 100}%` }} />
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-950/10">
+              <div className="h-full rounded-full bg-[linear-gradient(90deg,#0f8f78,#2f6df6)]" style={{ width: `${(mission.done / mission.total) * 100}%` }} />
             </div>
           </div>
         ))}
@@ -302,15 +302,15 @@ export function StockSearchPanel({
             id="ticker-input"
             value={ticker}
             onChange={(event) => onTickerChange(event.target.value.toUpperCase())}
-            className="h-12 w-full border-4 border-black bg-[#f7fff7] px-3 font-pixel text-sm shadow-[3px_3px_0_#111] outline-none focus:bg-white"
+            className="h-12 w-full rounded-[8px] border border-white/65 bg-white/72 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/90"
             aria-label="Ticker"
           />
           {results.length > 0 ? (
-            <div className="absolute z-30 mt-2 grid w-full gap-1 border-4 border-black bg-white p-2 shadow-[5px_5px_0_#111]">
+            <div className="glass-panel absolute z-30 mt-2 grid w-full gap-1 rounded-[8px] p-2">
               {results.map((item) => (
                 <button
                   key={item.symbol}
-                  className="grid grid-cols-[74px_1fr] items-center gap-2 border-2 border-black px-2 py-2 text-left text-xs hover:bg-[#d9f0e8]"
+                  className="grid grid-cols-[74px_1fr] items-center gap-2 rounded-[7px] px-2 py-2 text-left text-xs hover:bg-white/72"
                   onClick={() => onSelectTicker(item.symbol)}
                 >
                   <span className="font-pixel text-[10px]">{item.symbol}</span>
@@ -347,13 +347,13 @@ export function TeamDecisionPanel({
     <PixelCard title="Team Decision" eyebrow="manager explainability">
       <div className="grid gap-2 text-xs">
         <div className="grid gap-2 sm:grid-cols-3">
-          <div className="border-2 border-black bg-[#f7fff7] p-2"><span className="text-slate-500">Score</span><p className="font-pixel text-xs">{score ?? "--"}</p></div>
-          <div className="border-2 border-black bg-[#f7fff7] p-2"><span className="text-slate-500">Confidence</span><p className="font-pixel text-xs">{confidence ?? "--"}</p></div>
-          <div className="border-2 border-black bg-[#f7fff7] p-2"><span className="text-slate-500">Coverage</span><p className="font-pixel text-xs">{coverageText}</p></div>
+          <div className="glass-chip rounded-[8px] p-2"><span className="text-slate-500">Score</span><p className="font-pixel text-xs">{score ?? "--"}</p></div>
+          <div className="glass-chip rounded-[8px] p-2"><span className="text-slate-500">Confidence</span><p className="font-pixel text-xs">{confidence ?? "--"}</p></div>
+          <div className="glass-chip rounded-[8px] p-2"><span className="text-slate-500">Coverage</span><p className="font-pixel text-xs">{coverageText}</p></div>
         </div>
-        <p className="border-2 border-black bg-[#fff8e7] px-2 py-2 font-bold">{voteText}</p>
+        <p className="glass-chip rounded-[8px] px-2 py-2 font-bold">{voteText}</p>
         {caveats.slice(0, 3).map((caveat) => (
-          <p key={caveat} className="border-2 border-amber-900 bg-amber-100 px-2 py-1 text-amber-950">{caveat}</p>
+          <p key={caveat} className="rounded-[8px] border border-amber-200/80 bg-amber-100/78 px-2 py-1 text-amber-950">{caveat}</p>
         ))}
         <div className="grid max-h-72 gap-2 overflow-auto pr-1 sm:grid-cols-2">
           {children}
@@ -366,8 +366,8 @@ export function TeamDecisionPanel({
 export function AchievementToast({ show, title, detail }: { show: boolean; title: string; detail: string }) {
   if (!show) return null;
   return (
-    <div className="achievement-toast fixed right-3 top-3 z-50 max-w-[320px] border-4 border-black bg-[#fef3c7] p-3 shadow-[6px_6px_0_#111]" role="status">
-      <p className="font-pixel text-xs">Achievement Unlocked</p>
+    <div className="achievement-toast glass-panel fixed right-3 top-3 z-50 max-w-[320px] rounded-[8px] p-3" role="status">
+      <p className="font-pixel text-xs text-[color:var(--pf-accent)]">Achievement Unlocked</p>
       <p className="mt-1 text-sm font-black">{title}</p>
       <p className="mt-1 text-xs text-slate-700">{detail}</p>
     </div>

@@ -121,7 +121,7 @@ export default function ResearchPage() {
 
   return (
     <main className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 md:px-6">
-      <PixelCard title="Research Room" eyebrow="agent evidence" className="bg-[#fff8e7]">
+      <PixelCard title="Research Room" eyebrow="agent evidence">
         <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
           <label className="grid gap-1 text-xs font-black uppercase" htmlFor="research-ticker">
             Ticker
@@ -129,7 +129,7 @@ export default function ResearchPage() {
               id="research-ticker"
               value={ticker}
               onChange={(event) => setTicker(event.target.value.toUpperCase())}
-              className="h-12 border-4 border-black bg-[#f7fff7] px-3 font-pixel text-sm"
+              className="h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95"
             />
           </label>
           <PixelButton tone="magic" glow className="self-end" onClick={() => void refresh(ticker)}>
@@ -138,7 +138,7 @@ export default function ResearchPage() {
         </div>
       </PixelCard>
 
-      {error ? <p className="rounded-[6px] border-4 border-red-900 bg-red-100 p-3 text-sm text-red-950 pixel-card">{error}</p> : null}
+      {error ? <p className="glass-panel rounded-[8px] border-red-200/80 bg-red-100/80 p-3 text-sm text-red-950">{error}</p> : null}
 
       <section className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
         <TeamDecisionPanel
@@ -175,7 +175,7 @@ export default function ResearchPage() {
           <PixelButton tone="magic" onClick={startTeamMeeting} disabled={isMeetingRunning}>
             {isMeetingRunning ? "Meeting Running" : "Start Meeting"}
           </PixelButton>
-          <div className="mt-3 max-h-72 overflow-auto border-2 border-black bg-[#0f172a] p-2 font-mono text-xs text-[#bbf7d0]">
+          <div className="mt-3 max-h-72 overflow-auto rounded-[8px] border border-slate-950/10 bg-slate-950/92 p-2 font-mono text-xs text-emerald-100 shadow-inner">
             {meetingLog.length === 0 ? (
               <p>Waiting for the team lead...</p>
             ) : (
@@ -223,7 +223,7 @@ export default function ResearchPage() {
         </div>
         <div className="mt-3 grid gap-2 lg:grid-cols-2">
           {(marketContext?.news ?? []).slice(0, 4).map((item) => (
-            <p key={`${item.source}-${item.headline}`} className="border-2 border-black bg-[#f7fff7] px-2 py-2 text-xs leading-5">
+            <p key={`${item.source}-${item.headline}`} className="glass-chip rounded-[8px] px-2 py-2 text-xs leading-5">
               <span className="font-semibold">{item.sentiment.toUpperCase()}</span> {item.headline}
             </p>
           ))}
@@ -245,13 +245,13 @@ function DebateCard({
   tone: "good" | "bad" | "neutral";
   onSelect: () => void;
 }) {
-  const toneClass = tone === "good" ? "bg-emerald-100" : tone === "bad" ? "bg-red-100" : "bg-[#edf6f9]";
+  const toneClass = tone === "good" ? "border-emerald-200/80 bg-emerald-100/65" : tone === "bad" ? "border-red-200/80 bg-red-100/65" : "border-white/60 bg-white/56";
 
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`min-h-40 border-2 border-black p-3 text-left shadow-[3px_3px_0_#111] transition-transform hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-none ${toneClass}`}
+      className={`min-h-40 rounded-[8px] border p-3 text-left shadow-[0_16px_34px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur transition hover:-translate-y-0.5 ${toneClass}`}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-bold uppercase">{title}</p>
@@ -270,8 +270,8 @@ function DebateCard({
 function EvidenceReason({ reason }: { reason: string }) {
   const match = reason.match(/^\[([^\]]+)\]\s*(.*)$/);
   return (
-    <p className="flex gap-2 border-2 border-black bg-[#f7fff7] px-2 py-2 text-xs leading-5">
-      {match ? <span className="h-fit border border-black bg-white px-1 text-[10px] font-semibold uppercase">{match[1]}</span> : null}
+    <p className="glass-chip flex gap-2 rounded-[8px] px-2 py-2 text-xs leading-5">
+      {match ? <span className="h-fit rounded-full border border-slate-950/10 bg-white/70 px-1.5 text-[10px] font-semibold uppercase">{match[1]}</span> : null}
       <span>{match ? match[2] : reason}</span>
     </p>
   );
@@ -286,11 +286,11 @@ function agentLabel(agent: string) {
 }
 
 function badgeClass(value: string) {
-  const base = "border-2 border-slate-950 px-2 py-1 text-xs font-semibold";
-  if (value === "BUY") return `${base} bg-emerald-200 text-emerald-950`;
-  if (value === "AVOID") return `${base} bg-red-200 text-red-950`;
-  if (value === "HOLD") return `${base} bg-amber-200 text-amber-950`;
-  return `${base} bg-slate-200 text-slate-950`;
+  const base = "rounded-full border px-2.5 py-1 text-xs font-semibold";
+  if (value === "BUY") return `${base} border-emerald-200/80 bg-emerald-100/80 text-emerald-950`;
+  if (value === "AVOID") return `${base} border-red-200/80 bg-red-100/80 text-red-950`;
+  if (value === "HOLD") return `${base} border-amber-200/80 bg-amber-100/80 text-amber-950`;
+  return `${base} border-white/60 bg-white/56 text-slate-700`;
 }
 
 function formatMoney(value: number) {

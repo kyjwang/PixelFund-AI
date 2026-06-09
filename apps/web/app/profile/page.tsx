@@ -9,7 +9,7 @@ import { api } from "../../lib/api";
 
 type Portfolio = z.infer<typeof portfolioSchema>;
 
-const avatarColors = ["#7c3aed", "#0c7c59", "#2563eb", "#db2777", "#f97316", "#475569"];
+const avatarColors = ["#0f8f78", "#2f6df6", "#f2c14e", "#dc3f48", "#f97316", "#475569"];
 
 export default function ProfilePage() {
   const [user, setUser] = useState<DemoUser | null>(null);
@@ -20,7 +20,7 @@ export default function ProfilePage() {
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [preferredTicker, setPreferredTicker] = useState("AAPL");
-  const [avatarColor, setAvatarColor] = useState("#7c3aed");
+  const [avatarColor, setAvatarColor] = useState("#0f8f78");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +48,7 @@ export default function ProfilePage() {
     setName(nextUser?.name ?? "Pixel Trader");
     setTitle(nextUser?.title ?? "Demo Portfolio Captain");
     setPreferredTicker(nextUser?.preferredTicker ?? "AAPL");
-    setAvatarColor(nextUser?.avatarColor ?? "#7c3aed");
+    setAvatarColor(nextUser?.avatarColor ?? "#0f8f78");
     void refresh();
   }, []);
 
@@ -65,10 +65,10 @@ export default function ProfilePage() {
 
   return (
     <main className="mx-auto grid max-w-6xl gap-4 px-3 py-4 sm:px-4 md:px-6">
-      <PixelCard title="Trader Profile" eyebrow="local identity" className="bg-[#fff8e7]">
+      <PixelCard title="Trader Profile" eyebrow="local identity">
         <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
           <div className="grid justify-items-center gap-3">
-            <div className="relative h-36 w-32 border-4 border-black bg-[#d9f0e8] shadow-[6px_6px_0_#111]" aria-label="Profile picture">
+            <div className="glass-chip relative h-36 w-32 rounded-[8px]" aria-label="Profile picture">
               <div className="absolute left-1/2 top-5 h-16 w-16 -translate-x-1/2 border-4 border-black bg-[#f0b98d]" />
               <div className="absolute left-1/2 top-1 h-8 w-20 -translate-x-1/2 border-4 border-black" style={{ backgroundColor: avatarColor }} />
               <div className="absolute bottom-4 left-1/2 grid h-14 w-24 -translate-x-1/2 place-items-center border-4 border-black font-pixel text-xl text-white" style={{ backgroundColor: avatarColor }}>
@@ -91,7 +91,7 @@ export default function ProfilePage() {
               <StatTile label="P&L" value={`${formatMoney(portfolio?.totalPnl ?? 0)} (${formatSignedPercent(portfolio?.totalPnlPercent ?? 0)})`} tone={(portfolio?.totalPnl ?? 0) >= 0 ? "good" : "bad"} />
             </div>
 
-            {error ? <p className="rounded-[6px] border-4 border-red-900 bg-red-100 p-3 text-sm text-red-950 pixel-card">{error}</p> : null}
+            {error ? <p className="glass-panel rounded-[8px] border-red-200/80 bg-red-100/80 p-3 text-sm text-red-950">{error}</p> : null}
           </div>
         </div>
       </PixelCard>
@@ -105,7 +105,7 @@ export default function ProfilePage() {
                 id="profile-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="h-12 border-4 border-black bg-[#f7fff7] px-3 font-pixel text-sm"
+                className="h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95"
               />
             </label>
             <label className="grid gap-1 text-xs font-black uppercase" htmlFor="profile-title">
@@ -114,7 +114,7 @@ export default function ProfilePage() {
                 id="profile-title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                className="h-12 border-4 border-black bg-[#f7fff7] px-3 text-sm"
+                className="h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95"
               />
             </label>
             <label className="grid gap-1 text-xs font-black uppercase" htmlFor="profile-ticker">
@@ -123,7 +123,7 @@ export default function ProfilePage() {
                 id="profile-ticker"
                 value={preferredTicker}
                 onChange={(event) => setPreferredTicker(event.target.value.toUpperCase())}
-                className="h-12 border-4 border-black bg-[#f7fff7] px-3 font-pixel text-sm"
+                className="h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95"
               />
             </label>
           </div>
@@ -135,7 +135,7 @@ export default function ProfilePage() {
                 <button
                   key={color}
                   type="button"
-                  className={`h-10 w-10 border-4 border-black shadow-[3px_3px_0_#111] ${avatarColor === color ? "ring-4 ring-white" : ""}`}
+                  className={`h-10 w-10 rounded-full border border-white/70 shadow-[0_10px_24px_rgba(15,23,42,0.12)] ${avatarColor === color ? "ring-2 ring-[color:var(--pf-accent)]" : ""}`}
                   style={{ backgroundColor: color }}
                   onClick={() => setAvatarColor(color)}
                   aria-label={`Use avatar color ${color}`}
@@ -148,7 +148,7 @@ export default function ProfilePage() {
             <PixelButton type="submit" tone="magic" glow>
               Save Profile
             </PixelButton>
-            {saved ? <p className="border-2 border-black bg-emerald-200 px-2 py-1 text-xs font-bold text-emerald-950">Profile saved</p> : null}
+            {saved ? <p className="rounded-full border border-emerald-200/80 bg-emerald-100/80 px-2.5 py-1 text-xs font-bold text-emerald-950">Profile saved</p> : null}
           </div>
         </form>
       </PixelCard>

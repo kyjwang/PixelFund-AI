@@ -52,7 +52,7 @@ export default function HistoryPage() {
 
   return (
     <main className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 md:px-6">
-      <PixelCard title="History Vault" eyebrow="records room" className="bg-[#fff8e7]">
+      <PixelCard title="History Vault" eyebrow="records room">
         <div className="grid gap-2 sm:grid-cols-3">
           <StatTile label="Watchlist" value={`${watchlist.length} tickers`} />
           <StatTile label="Recommendations" value={`${runs.length} runs`} />
@@ -60,7 +60,7 @@ export default function HistoryPage() {
         </div>
       </PixelCard>
 
-      {error ? <p className="rounded-[6px] border-4 border-red-900 bg-red-100 p-3 text-sm text-red-950 pixel-card">{error}</p> : null}
+      {error ? <p className="glass-panel rounded-[8px] border-red-200/80 bg-red-100/80 p-3 text-sm text-red-950">{error}</p> : null}
 
       <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr_1fr]">
         <PixelCard title="Watchlist" eyebrow="ticker shelf">
@@ -68,7 +68,7 @@ export default function HistoryPage() {
             <input
               value={ticker}
               onChange={(event) => setTicker(event.target.value.toUpperCase())}
-              className="h-10 border-2 border-black bg-[#f7fff7] px-2 font-pixel text-sm"
+              className="h-10 rounded-[8px] border border-white/70 bg-white/70 px-2 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_10px_24px_rgba(15,23,42,0.07)] outline-none backdrop-blur focus:bg-white/95"
               aria-label="Ticker to add"
             />
             <PixelButton tone="good" onClick={() => void addWatchlist()}>
@@ -78,9 +78,9 @@ export default function HistoryPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             {watchlist.length === 0 ? <p className="text-xs text-slate-700">No watchlist items yet.</p> : null}
             {watchlist.map((item) => (
-              <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-1 border-2 border-black bg-[#f7fff7] px-2 py-1">
+              <div key={item.id} className="glass-chip grid grid-cols-[1fr_auto] items-center gap-1 rounded-full px-2.5 py-1">
                 <span className="text-xs font-semibold">{item.ticker}</span>
-                <button className="border-l border-black pl-2 text-xs text-red-800" onClick={() => void removeWatchlist(item.ticker)} aria-label={`Remove ${item.ticker}`}>
+                <button className="border-l border-slate-950/10 pl-2 text-xs text-red-800" onClick={() => void removeWatchlist(item.ticker)} aria-label={`Remove ${item.ticker}`}>
                   x
                 </button>
               </div>
@@ -89,7 +89,7 @@ export default function HistoryPage() {
         </PixelCard>
 
         <PixelCard title="Recommendation History" eyebrow="committee log">
-          <div className="max-h-[420px] overflow-auto border-2 border-black">
+          <div className="glass-chip max-h-[420px] overflow-auto rounded-[8px]">
             {runs.map((run) => (
               <div key={run.id} className="grid grid-cols-[70px_1fr_82px] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
                 <span className="font-semibold">{run.ticker}</span>
@@ -102,7 +102,7 @@ export default function HistoryPage() {
         </PixelCard>
 
         <PixelCard title="Fill History" eyebrow="virtual order tape">
-          <div className="max-h-[420px] overflow-auto border-2 border-black">
+          <div className="glass-chip max-h-[420px] overflow-auto rounded-[8px]">
             {trades.map((trade) => (
               <div key={trade.id} className="grid grid-cols-[52px_58px_1fr] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
                 <span className={trade.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-slate-800"}>{trade.side}</span>

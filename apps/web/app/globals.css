@@ -4,23 +4,29 @@
 
 :root {
   --font-pixel: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --pf-ink: #101827;
-  --pf-paper: #fffdf4;
-  --pf-mint: #dff7ee;
-  --pf-sky: #b8f3ff;
-  --pf-gold: #f4d06f;
-  --pf-accent: #0c7c59;
-  --pf-shadow: #101827;
+  --pf-ink: #07111f;
+  --pf-muted: #5d6b7f;
+  --pf-paper: rgba(255, 255, 255, 0.72);
+  --pf-paper-strong: rgba(255, 255, 255, 0.88);
+  --pf-border: rgba(255, 255, 255, 0.58);
+  --pf-hairline: rgba(15, 23, 42, 0.1);
+  --pf-accent: #0f8f78;
+  --pf-accent-2: #2f6df6;
+  --pf-gold: #f2c14e;
+  --pf-danger: #dc3f48;
+  --pf-shadow: 0 24px 70px rgba(15, 23, 42, 0.15), 0 2px 10px rgba(15, 23, 42, 0.06);
 }
 
 body {
-  @apply bg-[#c7e9e4] text-slate-900 antialiased;
+  @apply bg-slate-100 text-slate-950 antialiased;
   background:
-    linear-gradient(90deg, rgba(16, 24, 39, 0.045) 1px, transparent 1px),
-    linear-gradient(rgba(16, 24, 39, 0.045) 1px, transparent 1px),
-    linear-gradient(180deg, #b8f3ff 0%, #edf6f9 44%, #dff7ee 100%);
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    radial-gradient(1200px 680px at 12% -14%, rgba(47, 109, 246, 0.22), transparent 56%),
+    radial-gradient(1000px 640px at 86% 0%, rgba(15, 143, 120, 0.2), transparent 54%),
+    linear-gradient(145deg, #f8fbff 0%, #e9f2f5 48%, #f7f5ef 100%);
   background-attachment: fixed;
-  background-size: 20px 20px, 20px 20px, auto;
+  background-size: 24px 24px, 24px 24px, auto, auto, auto;
 }
 
 body::before {
@@ -30,24 +36,45 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    linear-gradient(135deg, rgba(12, 124, 89, 0.14), transparent 34%),
-    linear-gradient(315deg, rgba(244, 208, 111, 0.24), transparent 38%);
+    linear-gradient(120deg, rgba(255, 255, 255, 0.64), transparent 32%),
+    linear-gradient(300deg, rgba(242, 193, 78, 0.16), transparent 42%);
+  mask-image: linear-gradient(180deg, black 0%, transparent 86%);
 }
 
 ::selection {
-  background: #0c7c59;
-  color: #fffdf4;
+  background: #0f8f78;
+  color: white;
 }
 
 .pixel-card {
   image-rendering: pixelated;
-  box-shadow: 0 0 0 2px var(--pf-shadow), 6px 6px 0 var(--pf-shadow);
+  box-shadow: var(--pf-shadow);
 }
 
 .pixel-panel,
 .pixel-button,
 .hud-chip {
   image-rendering: pixelated;
+}
+
+.glass-panel {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.54));
+  border: 1px solid var(--pf-border);
+  box-shadow: var(--pf-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px) saturate(155%);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
+}
+
+.glass-chip {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 10px 26px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+
+.pixel-accent {
+  box-shadow: inset 0 -2px 0 rgba(15, 23, 42, 0.1), inset 0 0 0 1px rgba(15, 23, 42, 0.08);
 }
 
 .pixel-button {
@@ -80,7 +107,7 @@ body::before {
   width: 38px;
   height: 42px;
   background: #f0b98d;
-  box-shadow: 0 -12px 0 #1e293b, 0 42px 0 10px #7c3aed;
+  box-shadow: 0 -12px 0 #1e293b, 0 42px 0 10px #0f8f78;
 }
 
 .pixel-portrait::before {
@@ -102,10 +129,10 @@ body::before {
 
 @keyframes pixel-glow {
   0%, 100% {
-    box-shadow: 4px 4px 0 #111, 0 0 0 0 rgba(124, 58, 237, 0.45);
+    box-shadow: 0 14px 34px rgba(15, 143, 120, 0.2), 0 0 0 0 rgba(15, 143, 120, 0.28);
   }
   50% {
-    box-shadow: 5px 5px 0 #111, 0 0 0 6px rgba(124, 58, 237, 0.18), 0 0 22px rgba(124, 58, 237, 0.52);
+    box-shadow: 0 16px 42px rgba(15, 143, 120, 0.28), 0 0 0 6px rgba(15, 143, 120, 0.1);
   }
 }
 
@@ -134,8 +161,24 @@ body::before {
 }
 
 :focus-visible {
-  outline: 3px solid #0c7c59;
+  outline: 3px solid rgba(15, 143, 120, 0.72);
   outline-offset: 2px;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-panel,
+  .glass-chip {
+    background: rgba(255, 255, 255, 0.94);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-panel,
+  .glass-chip {
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
