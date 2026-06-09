@@ -44,7 +44,11 @@ export default function HistoryPage() {
 
     setIsClearing(true);
     try {
-      await api("/analysis-runs", clearHistorySchema, { method: "DELETE" });
+      await api("/analysis-runs", clearHistorySchema, {
+        method: "DELETE",
+        body: JSON.stringify({ analysisRunIds: runs.map((run) => run.id) })
+      });
+      setRuns([]);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to clear AI history");

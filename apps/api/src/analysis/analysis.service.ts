@@ -151,11 +151,22 @@ export class AnalysisService {
     });
   }
 
-  async clearRuns(ownerKey?: string) {
+  async clearRuns(ownerKey?: string, visibleAnalysisRunIds?: string[]) {
     const key = this.accountKey(ownerKey);
+    const visibleIds = Array.from(new Set((visibleAnalysisRunIds ?? []).map((id) => id.trim()).filter(Boolean)));
+    const where =
+      key === "demo" || visibleIds.length === 0
+        ? { ownerKey: key }
+        : {
+            OR: [
+              { ownerKey: key },
+              { ownerKey: "demo", id: { in: visibleIds } }
+            ]
+          };
+
     return this.prisma.$transaction(async (tx) => {
       const runs = await tx.analysisRun.findMany({
-        where: { ownerKey: key },
+        where,
         select: { id: true }
       });
       const runIds = runs.map((run) => run.id);
@@ -165,9 +176,12 @@ export class AnalysisService {
               where: { analysisRunId: { in: runIds } }
             })
           : { count: 0 };
-      const deletedAnalysisRuns = await tx.analysisRun.deleteMany({
-        where: { ownerKey: key }
-      });
+      const deletedAnalysisRuns =
+        runIds.length > 0
+          ? await tx.analysisRun.deleteMany({
+              where: { id: { in: runIds } }
+            })
+          : { count: 0 };
 
       return {
         deletedAnalysisRuns: deletedAnalysisRuns.count,

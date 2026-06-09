@@ -150,7 +150,41 @@ describe("analysis service queue handoff", () => {
       where: { analysisRunId: { in: ["run-a", "run-b"] } }
     });
     expect(txClient.analysisRun.deleteMany).toHaveBeenCalledWith({
-      where: { ownerKey: "account-a" }
+      where: { id: { in: ["run-a", "run-b"] } }
+    });
+  });
+
+  test("clears visible legacy demo analysis rows without deleting other owners", async () => {
+    const txClient = {
+      analysisRun: {
+        findMany: jest.fn(async () => [{ id: "current-run" }, { id: "legacy-demo-run" }]),
+        deleteMany: jest.fn(async () => ({ count: 2 }))
+      },
+      agentResult: {
+        deleteMany: jest.fn(async () => ({ count: 32 }))
+      }
+    };
+    const prisma = {
+      $transaction: jest.fn(async (callback: any) => callback(txClient))
+    };
+    const service = new AnalysisService(prisma as any, { emit: jest.fn() } as any, {} as any);
+
+    await expect(service.clearRuns("account-a", ["legacy-demo-run", "other-owner-run"])).resolves.toEqual({
+      deletedAnalysisRuns: 2,
+      deletedAgentResults: 32
+    });
+
+    expect(txClient.analysisRun.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { ownerKey: "account-a" },
+          { ownerKey: "demo", id: { in: ["legacy-demo-run", "other-owner-run"] } }
+        ]
+      },
+      select: { id: true }
+    });
+    expect(txClient.analysisRun.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["current-run", "legacy-demo-run"] } }
     });
   });
 });

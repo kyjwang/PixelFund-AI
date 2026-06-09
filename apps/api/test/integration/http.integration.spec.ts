@@ -171,6 +171,36 @@ describe("http integration", () => {
     expect(tradesA.body.data.map((trade: any) => trade.ticker)).toEqual(["MSFT"]);
   });
 
+  test("clears visible legacy demo analysis rows from history clear requests", async () => {
+    const accountA = "clear-visible-legacy-a";
+    const runA = await request(server)
+      .post("/analysis-runs")
+      .set("x-demo-user-id", accountA)
+      .send({ ticker: "MSFT", idempotencyKey: "visible-a-msft" })
+      .expect(201);
+    const legacyRun = await request(server)
+      .post("/analysis-runs")
+      .set("x-demo-user-id", "demo")
+      .send({ ticker: "NVDA", idempotencyKey: "visible-legacy-nvda" })
+      .expect(201);
+    const otherRun = await request(server)
+      .post("/analysis-runs")
+      .set("x-demo-user-id", "other-visible-owner")
+      .send({ ticker: "AAPL", idempotencyKey: "visible-other-aapl" })
+      .expect(201);
+
+    const cleared = await request(server)
+      .delete("/analysis-runs")
+      .set("x-demo-user-id", accountA)
+      .send({ analysisRunIds: [legacyRun.body.data.id, otherRun.body.data.id] })
+      .expect(200);
+
+    expect(cleared.body.data.deletedAnalysisRuns).toBe(2);
+    expect(await prisma.analysisRun.findUnique({ where: { id: runA.body.data.id } })).toBeNull();
+    expect(await prisma.analysisRun.findUnique({ where: { id: legacyRun.body.data.id } })).toBeNull();
+    expect(await prisma.analysisRun.findUnique({ where: { id: otherRun.body.data.id } })).toBeTruthy();
+  });
+
   test("trade updates portfolio accounting", async () => {
     await request(server).post("/trades").send({ ticker: "MSFT", side: "BUY", quantity: 2 }).expect(201);
     const afterBuy = await request(server).get("/portfolio").expect(200);
