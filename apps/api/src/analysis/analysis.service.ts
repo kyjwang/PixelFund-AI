@@ -1,5 +1,5 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { AgentStatus } from "@prisma/client";
 import { Queue } from "bullmq";
 import { ANALYSIS_PIPELINE, aggregatePortfolioManager, buildAnalysisExplanation } from "@pixelfund/domain";
@@ -21,7 +21,10 @@ export class AnalysisService {
         include: { recommendations: true },
         orderBy: { createdAt: "desc" }
       });
-      if (existing) return existing;
+      if (existing) {
+        await this.ensureRunQueued(existing);
+        return existing;
+      }
     }
 
     const freshnessWindowMs = 60_000;
@@ -30,7 +33,10 @@ export class AnalysisService {
       include: { recommendations: true },
       orderBy: { createdAt: "desc" }
     });
-    if (recent) return recent;
+    if (recent && recent.status !== "FAILED") {
+      await this.ensureRunQueued(recent);
+      return recent;
+    }
 
     const run = await this.prisma.analysisRun.create({
       data: {
@@ -47,18 +53,40 @@ export class AnalysisService {
       include: { recommendations: true }
     });
 
-    await this.queue.add(
-      "run-analysis",
-      { analysisRunId: run.id, ticker },
-      {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 1000 },
-        removeOnComplete: { age: 3600, count: 1000 },
-        removeOnFail: { age: 24 * 3600, count: 2000 }
-      }
-    );
+    await this.ensureRunQueued(run);
 
     return run;
+  }
+
+  private async ensureRunQueued(run: { id: string; ticker: string; status?: string }) {
+    if (run.status === "COMPLETED" || run.status === "FAILED") return;
+
+    try {
+      const existingJob = await this.queue.getJob(run.id);
+      if (existingJob) return;
+
+      await this.queue.add(
+        "run-analysis",
+        { analysisRunId: run.id, ticker: run.ticker },
+        {
+          jobId: run.id,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 1000 },
+          removeOnComplete: { age: 3600, count: 1000 },
+          removeOnFail: { age: 24 * 3600, count: 2000 }
+        }
+      );
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "unknown queue error";
+      await this.prisma.analysisRun.update({
+        where: { id: run.id },
+        data: {
+          status: "FAILED",
+          errorReason: `Analysis queue unavailable: ${reason}`
+        }
+      });
+      throw new ServiceUnavailableException("Analysis queue unavailable. Start Redis/API workers and try again.");
+    }
   }
 
   async finalizeManager(analysisRunId: string) {

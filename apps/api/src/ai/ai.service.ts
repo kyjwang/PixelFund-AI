@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import type { AgentAnalysisOutput } from "@pixelfund/domain";
 import type { MarketContext } from "@pixelfund/schemas";
+import { resolveAiClientSettings } from "./ai.config";
 
 const narrationSchema = z.object({
   summary: z.string(),
@@ -11,10 +12,6 @@ const narrationSchema = z.object({
 
 type Narration = z.infer<typeof narrationSchema>;
 const defaultPolishedAgents = new Set(["TECHNICAL_ANALYST", "NEWS_ANALYST", "FUNDAMENTALS_ANALYST", "RISK_ANALYST"]);
-
-function configured(value: string | undefined) {
-  return Boolean(value && value.trim() && !value.startsWith("your_"));
-}
 
 function extractNarration(value: unknown): Narration | null {
   const direct = narrationSchema.safeParse(value);
@@ -48,31 +45,22 @@ export class AiService {
   private model: string = "";
 
   constructor() {
-    const requestedModel = process.env.AI_MODEL ?? process.env.NVIDIA_MODEL ?? process.env.OPENAI_MODEL;
-    const useNvidia =
-      process.env.AI_PROVIDER === "nvidia" ||
-      process.env.NVIDIA_BASE_URL !== undefined ||
-      process.env.NVIDIA_MODEL !== undefined ||
-      requestedModel === "openai/gpt-oss-20b";
+    const settings = resolveAiClientSettings();
+    if (!settings.enabled || !settings.apiKey) return;
 
-    const nvidiaApiKey = configured(process.env.NVIDIA_API_KEY)
-      ? process.env.NVIDIA_API_KEY
-      : useNvidia && configured(process.env.OPENAI_API_KEY)
-        ? process.env.OPENAI_API_KEY
-        : undefined;
-    const nvidiaBaseUrl = process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
-
-    if (nvidiaApiKey) {
+    if (settings.provider === "nvidia") {
       this.client = new OpenAI({
-        baseURL: nvidiaBaseUrl,
-        apiKey: nvidiaApiKey
+        baseURL: settings.baseURL,
+        apiKey: settings.apiKey,
+        timeout: 20_000
       });
-      this.model = requestedModel ?? "openai/gpt-oss-20b";
-    } else if (configured(process.env.OPENAI_API_KEY)) {
+      this.model = settings.model;
+    } else if (settings.provider === "openai") {
       this.client = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY
+        apiKey: settings.apiKey,
+        timeout: 20_000
       });
-      this.model = requestedModel ?? "gpt-4.1-mini";
+      this.model = settings.model;
     }
   }
 

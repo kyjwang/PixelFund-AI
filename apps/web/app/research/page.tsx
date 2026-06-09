@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 import {
@@ -17,6 +17,7 @@ import {
 } from "../../components/GameUI";
 import { gameAgents } from "../../components/PixelOffice";
 import { api } from "../../lib/api";
+import { getAnalysisProgress, shouldPollAnalysisRun } from "../../lib/analysis-polling";
 
 type AnalysisRun = z.infer<typeof analysisRunSchema>;
 type AnalysisExplanation = z.infer<typeof analysisExplanationSchema>;
@@ -43,7 +44,9 @@ export default function ResearchPage() {
   const [selectedAgent, setSelectedAgent] = useState("BULL_RESEARCHER");
   const [meetingLog, setMeetingLog] = useState<string[]>([]);
   const [isMeetingRunning, setIsMeetingRunning] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const analysisPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const latest = useMemo(
     () => {
@@ -56,6 +59,15 @@ export default function ResearchPage() {
   const completedCommittee = useMemo(
     () => (latest?.recommendations ?? []).filter((rec) => rec.status === "COMPLETED" && rec.agentType !== "PORTFOLIO_MANAGER"),
     [latest]
+  );
+  const analysisProgress = useMemo(() => getAnalysisProgress(latest), [latest]);
+  const analysisIsActive = isAnalyzing || analysisProgress.isActive;
+  const recommendationRevision = useMemo(
+    () =>
+      (latest?.recommendations ?? [])
+        .map((rec) => `${rec.agentType}:${rec.status}:${rec.updatedAt ?? ""}:${rec.recommendation ?? ""}`)
+        .join("|"),
+    [latest?.recommendations]
   );
 
   const voteMix = useMemo(() => {
@@ -82,8 +94,66 @@ export default function ResearchPage() {
       setRuns(nextRuns);
       setMarketContext(nextContext);
       setError(null);
+      return nextRuns;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to load research data");
+      return null;
+    }
+  }
+
+  function clearAnalysisPoll() {
+    if (!analysisPollTimerRef.current) return;
+    clearTimeout(analysisPollTimerRef.current);
+    analysisPollTimerRef.current = null;
+  }
+
+  function pollAnalysisRun(runId: string, targetTicker: string, attempt = 0) {
+    clearAnalysisPoll();
+    analysisPollTimerRef.current = setTimeout(async () => {
+      try {
+        const nextRuns = await api("/analysis-runs", z.array(analysisRunSchema));
+        setRuns(nextRuns);
+        const nextRun = nextRuns.find((run) => run.id === runId);
+        if (!nextRun || !shouldPollAnalysisRun(nextRun.status) || attempt >= 80) {
+          setIsAnalyzing(false);
+          clearAnalysisPoll();
+          await refresh(targetTicker);
+          return;
+        }
+        pollAnalysisRun(runId, targetTicker, attempt + 1);
+      } catch (e) {
+        setIsAnalyzing(false);
+        clearAnalysisPoll();
+        setError(e instanceof Error ? e.message : "Unable to check analysis progress");
+      }
+    }, 1500);
+  }
+
+  async function runAnalysis(targetTicker = ticker) {
+    const normalized = targetTicker.trim().toUpperCase();
+    if (!normalized) {
+      setError("Choose a ticker before asking the AI team.");
+      return;
+    }
+
+    setTicker(normalized);
+    setIsAnalyzing(true);
+    try {
+      const run = await api("/analysis-runs", analysisRunSchema, {
+        method: "POST",
+        body: JSON.stringify({ ticker: normalized, idempotencyKey: `${normalized}-${Date.now()}` })
+      });
+      setRuns((existing) => [run, ...existing.filter((item) => item.id !== run.id)]);
+      await refresh(normalized);
+      if (shouldPollAnalysisRun(run.status)) {
+        pollAnalysisRun(run.id, normalized);
+      } else {
+        setIsAnalyzing(false);
+      }
+    } catch (e) {
+      setIsAnalyzing(false);
+      clearAnalysisPoll();
+      setError(e instanceof Error ? e.message : "Analysis failed");
     }
   }
 
@@ -102,6 +172,7 @@ export default function ResearchPage() {
 
   useEffect(() => {
     void refresh(ticker);
+    return () => clearAnalysisPoll();
   }, []);
 
   useEffect(() => {
@@ -118,7 +189,17 @@ export default function ResearchPage() {
       .catch(() => setExplanation(null));
 
     return () => controller.abort();
-  }, [latest?.id, latest?.updatedAt]);
+  }, [latest?.id, latest?.updatedAt, recommendationRevision]);
+
+  useEffect(() => {
+    if (!latest?.id) return;
+    if (shouldPollAnalysisRun(latest.status)) {
+      setIsAnalyzing(true);
+      if (!analysisPollTimerRef.current) pollAnalysisRun(latest.id, latest.ticker);
+      return;
+    }
+    setIsAnalyzing(false);
+  }, [latest?.id, latest?.status, latest?.ticker]);
 
   return (
     <main className="mx-auto grid max-w-7xl gap-4 px-3 py-4 sm:px-4 md:px-6">
@@ -134,10 +215,11 @@ export default function ResearchPage() {
               className="h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95"
             />
           </label>
-          <PixelButton tone="magic" glow className="self-end" onClick={() => void refresh(ticker)} disabled={!ticker.trim()}>
-            {ticker.trim() ? "Load Evidence" : "Choose Symbol"}
+          <PixelButton tone="magic" glow className="self-end" onClick={() => void runAnalysis(ticker)} disabled={!ticker.trim() || analysisIsActive}>
+            {analysisIsActive ? `Analyzing ${analysisProgress.percent}%` : ticker.trim() ? "Ask AI Team" : "Choose Symbol"}
           </PixelButton>
         </div>
+        {latest ? <ResearchProgressPanel progress={analysisProgress} /> : null}
         <p className="mt-3 text-xs leading-5 text-slate-600">
           Evidence loads only after a ticker is entered, so the room starts without a built-in stock opinion.
         </p>
@@ -236,6 +318,38 @@ export default function ResearchPage() {
         </div>
       </PixelCard>
     </main>
+  );
+}
+
+function ResearchProgressPanel({ progress }: { progress: ReturnType<typeof getAnalysisProgress> }) {
+  const progressTone = progress.failed ? "text-red-700" : progress.isActive ? "text-[color:var(--pf-accent)]" : "text-slate-600";
+
+  return (
+    <div className="mt-3 rounded-[8px] border border-white/65 bg-white/58 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]" aria-live="polite">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <p className="font-bold uppercase text-slate-700">AI team progress</p>
+        <p className={`font-pixel text-[10px] ${progressTone}`}>{progress.etaLabel}</p>
+      </div>
+      <div
+        className="mt-2 h-3 overflow-hidden rounded-full bg-slate-950/10"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress.percent}
+        aria-label={`AI team analysis ${progress.percent}% complete`}
+      >
+        <div className="h-full rounded-full bg-[linear-gradient(90deg,#0f8f78,#2f6df6)] transition-[width] duration-500" style={{ width: `${progress.percent}%` }} />
+      </div>
+      <div className="mt-2 grid gap-1 text-xs leading-5 text-slate-600 sm:grid-cols-[1fr_auto]">
+        <p>
+          <span className="font-semibold text-slate-800">{progress.currentLabel}</span>
+        </p>
+        <p className="font-pixel text-[10px] text-slate-700">
+          {progress.completed}/{progress.total} done
+          {progress.failed > 0 ? `, ${progress.failed} failed` : ""}
+        </p>
+      </div>
+    </div>
   );
 }
 

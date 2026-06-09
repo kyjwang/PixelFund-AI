@@ -1,5 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import Redis from "ioredis";
+import { resolveAiClientSettings } from "../ai/ai.config";
 import { PrismaService } from "../common/prisma.service";
 
 type ComponentStatus = "OK" | "DEGRADED" | "DOWN";
@@ -79,9 +80,8 @@ function configuredComponent(name: string, label: string, envKey: string, checke
 }
 
 function aiComponent(checkedAt: string): HealthComponent {
-  const provider = process.env.AI_PROVIDER === "nvidia" ? "NVIDIA" : "OpenAI";
-  const envKey = process.env.AI_PROVIDER === "nvidia" ? "NVIDIA_API_KEY" : "OPENAI_API_KEY";
-  const value = process.env[envKey] ?? (envKey === "NVIDIA_API_KEY" ? process.env.OPENAI_API_KEY : undefined);
-  if (!value || value.startsWith("your_")) return component("ai", "DEGRADED", `${provider} key is not configured; agent output may use fallback behavior.`, checkedAt);
+  const settings = resolveAiClientSettings();
+  const provider = settings.provider === "nvidia" ? "NVIDIA" : settings.provider === "openai" ? "OpenAI" : "AI provider";
+  if (!settings.enabled) return component("ai", "DEGRADED", settings.warning ?? `${provider} key is not configured; fallback output may be used.`, checkedAt);
   return component("ai", "OK", `${provider} configuration is present.`, checkedAt);
 }
