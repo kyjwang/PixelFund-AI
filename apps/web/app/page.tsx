@@ -30,6 +30,7 @@ import {
 } from "../components/GameUI";
 import { gameAgents, PixelOffice } from "../components/PixelOffice";
 import { api } from "../lib/api";
+import { shouldPollAnalysisRun } from "../lib/analysis-polling";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
 const stockSearchSchema = z.array(z.object({ symbol: z.string(), description: z.string() }));
@@ -64,6 +65,7 @@ export default function HomePage() {
   const tickerRef = useRef(ticker);
   const watchlistRef = useRef(watchlist);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const analysisPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedTicker = ticker.trim().toUpperCase();
   const hasTicker = selectedTicker.length > 0;
 
@@ -76,16 +78,29 @@ export default function HomePage() {
         api("/watchlist", z.array(watchlistItemSchema)),
         api("/trades?limit=20", z.array(tradeSchema))
       ]);
-      const c = normalized ? await api(`/stocks/${encodeURIComponent(normalized)}/context`, marketContextSchema) : null;
       setPortfolio(p);
       setRuns(r);
-      setMarketContext(c);
-      setQuote(c?.quote ?? null);
       setWatchlist(w);
       setTrades(t);
       setError(null);
+      if (!normalized) {
+        setMarketContext(null);
+        setQuote(null);
+        return r;
+      }
+      try {
+        const c = await api(`/stocks/${encodeURIComponent(normalized)}/context`, marketContextSchema);
+        setMarketContext(c);
+        setQuote(c.quote);
+      } catch (e) {
+        setMarketContext(null);
+        setQuote(null);
+        setError(e instanceof Error ? e.message : "Unable to load market context");
+      }
+      return r;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to refresh office data");
+      return null;
     }
   }
 
@@ -100,6 +115,34 @@ export default function HomePage() {
   function subscribeTickers(socket: Socket, currentTicker: string, items: WatchlistItem[]) {
     if (currentTicker.trim()) socket.emit("quote.subscribe", { ticker: currentTicker.trim().toUpperCase() });
     for (const item of items) socket.emit("quote.subscribe", { ticker: item.ticker });
+  }
+
+  function clearAnalysisPoll() {
+    if (!analysisPollTimerRef.current) return;
+    clearTimeout(analysisPollTimerRef.current);
+    analysisPollTimerRef.current = null;
+  }
+
+  function pollAnalysisRun(runId: string, targetTicker: string, attempt = 0) {
+    clearAnalysisPoll();
+    analysisPollTimerRef.current = setTimeout(async () => {
+      try {
+        const nextRuns = await api("/analysis-runs", z.array(analysisRunSchema));
+        setRuns(nextRuns);
+        const nextRun = nextRuns.find((run) => run.id === runId);
+        if (!nextRun || !shouldPollAnalysisRun(nextRun.status) || attempt >= 80) {
+          setIsAnalyzing(false);
+          clearAnalysisPoll();
+          await refresh(targetTicker);
+          return;
+        }
+        pollAnalysisRun(runId, targetTicker, attempt + 1);
+      } catch (e) {
+        setIsAnalyzing(false);
+        clearAnalysisPoll();
+        setError(e instanceof Error ? e.message : "Unable to check analysis progress");
+      }
+    }, 1500);
   }
 
   useEffect(() => {
@@ -176,10 +219,12 @@ export default function HomePage() {
     socket.on("analysis.agent.failed", () => scheduleRefresh(tickerRef.current));
     socket.on("analysis.portfolioRecommendation.completed", () => {
       setIsAnalyzing(false);
+      clearAnalysisPoll();
       scheduleRefresh(tickerRef.current);
     });
     socket.on("analysis.portfolioRecommendation.failed", () => {
       setIsAnalyzing(false);
+      clearAnalysisPoll();
       scheduleRefresh(tickerRef.current);
     });
     socket.on("portfolio.updated", (payload: unknown) => {
@@ -195,6 +240,7 @@ export default function HomePage() {
         clearTimeout(refreshTimerRef.current);
         refreshTimerRef.current = null;
       }
+      clearAnalysisPoll();
       socket.disconnect();
     };
   }, []);
@@ -279,19 +325,24 @@ export default function HomePage() {
     }
     setTicker(normalized);
     setIsAnalyzing(true);
-    setHasAskedTeam(true);
-    setAchievement({ title: "Committee Convened", detail: `${normalized} is now moving through the AI office.` });
-    window.setTimeout(() => setAchievement(null), 3200);
     try {
       const run = await api("/analysis-runs", analysisRunSchema, {
         method: "POST",
         body: JSON.stringify({ ticker: normalized, idempotencyKey: `${normalized}-${Date.now()}` })
       });
       setRuns((existing) => [run, ...existing.filter((item) => item.id !== run.id)]);
+      setHasAskedTeam(true);
+      setAchievement({ title: "Committee Convened", detail: `${normalized} is now moving through the AI office.` });
+      window.setTimeout(() => setAchievement(null), 3200);
       await refresh(normalized);
-      setError(null);
+      if (shouldPollAnalysisRun(run.status)) {
+        pollAnalysisRun(run.id, normalized);
+      } else {
+        setIsAnalyzing(false);
+      }
     } catch (e) {
       setIsAnalyzing(false);
+      clearAnalysisPoll();
       setError(e instanceof Error ? e.message : "Analysis failed");
     }
   }
