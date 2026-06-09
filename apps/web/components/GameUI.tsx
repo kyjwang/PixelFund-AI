@@ -118,14 +118,14 @@ export function PortfolioHud({
   mood: string;
 }) {
   const items = [
-    { label: "Virtual Cash", value: cash },
-    { label: "Portfolio", value: portfolioValue },
-    { label: "P/L", value: pnlPercent },
-    { label: "Hit Rate", value: hitRate },
-    { label: "Desk", value: selectedDesk },
-    { label: "XP Level", value: `Lv ${level}` },
-    { label: "Streak", value: streak },
-    { label: "Mood", value: mood }
+    { label: "Virtual Cash", value: cash, help: "Uninvested simulator money" },
+    { label: "Portfolio", value: portfolioValue, help: "Cash plus open positions" },
+    { label: "P/L", value: pnlPercent, help: "Total profit or loss" },
+    { label: "Hit Rate", value: hitRate, help: "Completed ideas that worked" },
+    { label: "Desk", value: selectedDesk, help: "Selected AI specialist" },
+    { label: "XP Level", value: `Lv ${level}`, help: "Activity progress" },
+    { label: "Streak", value: streak, help: "Recent result direction" },
+    { label: "Mood", value: mood, help: "Portfolio state" }
   ];
 
   return (
@@ -134,6 +134,7 @@ export function PortfolioHud({
         <div key={item.label} className="hud-chip glass-chip rounded-[8px] px-2.5 py-2">
           <p className="text-[9px] font-bold uppercase text-slate-500">{item.label}</p>
           <p className="mt-1 truncate font-pixel text-[10px] text-slate-950">{item.value}</p>
+          <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">{item.help}</p>
         </div>
       ))}
     </div>
@@ -143,11 +144,13 @@ export function PortfolioHud({
 export function StatTile({
   label,
   value,
-  tone
+  tone,
+  help
 }: {
   label: string;
   value: string;
   tone?: "good" | "bad" | "warn";
+  help?: string;
 }) {
   const toneClass =
     tone === "good"
@@ -162,6 +165,7 @@ export function StatTile({
     <div className="glass-chip rounded-[8px] px-2.5 py-2">
       <p className="text-[10px] font-bold uppercase text-slate-500">{label}</p>
       <p className={`mt-1 truncate text-xs font-semibold ${toneClass}`}>{value}</p>
+      {help ? <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">{help}</p> : null}
     </div>
   );
 }
@@ -282,7 +286,8 @@ export function StockSearchPanel({
   isAnalyzing,
   onTickerChange,
   onSelectTicker,
-  onAnalyze
+  onAnalyze,
+  analyzeDisabled = false
 }: {
   ticker: string;
   results: Array<{ symbol: string; description: string }>;
@@ -290,6 +295,7 @@ export function StockSearchPanel({
   onTickerChange: (value: string) => void;
   onSelectTicker: (symbol: string) => void;
   onAnalyze: () => void;
+  analyzeDisabled?: boolean;
 }) {
   return (
     <PixelCard title="Stock Scanner" eyebrow="mission control">
@@ -302,6 +308,7 @@ export function StockSearchPanel({
             id="ticker-input"
             value={ticker}
             onChange={(event) => onTickerChange(event.target.value.toUpperCase())}
+            placeholder="Search ticker"
             className="h-12 w-full rounded-[8px] border border-white/65 bg-white/72 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/90"
             aria-label="Ticker"
           />
@@ -320,10 +327,13 @@ export function StockSearchPanel({
             </div>
           ) : null}
         </div>
-        <PixelButton tone="magic" glow className="self-end" onClick={onAnalyze} disabled={isAnalyzing}>
-          {isAnalyzing ? "Thinking..." : "Ask AI Team"}
+        <PixelButton tone="magic" glow className="self-end" onClick={onAnalyze} disabled={isAnalyzing || analyzeDisabled}>
+          {isAnalyzing ? "Thinking..." : ticker.trim() ? "Ask AI Team" : "Choose Symbol"}
         </PixelButton>
       </div>
+      <p className="mt-3 text-xs leading-5 text-slate-600">
+        Start with any ticker you want to research. No market price, chart, or recommendation is loaded until a symbol is selected.
+      </p>
     </PixelCard>
   );
 }

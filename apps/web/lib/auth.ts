@@ -35,7 +35,7 @@ export function setDemoUser(name: string) {
     name: cleanName,
     title: existing?.title ?? "Demo Portfolio Captain",
     avatarColor: existing?.avatarColor ?? "#0f8f78",
-    preferredTicker: existing?.preferredTicker ?? "AAPL",
+    preferredTicker: existing?.preferredTicker ?? "",
     createdAt: new Date().toISOString()
   };
 
@@ -53,7 +53,7 @@ export function updateDemoUser(update: Partial<Pick<DemoUser, "name" | "title" |
     name: update.name?.trim() || existing?.name || "Pixel Trader",
     title: update.title?.trim() || existing?.title || "Demo Portfolio Captain",
     avatarColor: update.avatarColor || existing?.avatarColor || "#0f8f78",
-    preferredTicker: update.preferredTicker?.trim().toUpperCase() || existing?.preferredTicker || "AAPL",
+    preferredTicker: update.preferredTicker === undefined ? existing?.preferredTicker || "" : update.preferredTicker.trim().toUpperCase(),
     createdAt: existing?.createdAt ?? new Date().toISOString()
   };
 

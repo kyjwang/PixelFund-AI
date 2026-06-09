@@ -36,7 +36,7 @@ const meetingSteps = [
 
 export default function ResearchPage() {
   const searchParams = useSearchParams();
-  const [ticker, setTicker] = useState(searchParams.get("ticker")?.toUpperCase() ?? "AAPL");
+  const [ticker, setTicker] = useState(searchParams.get("ticker")?.trim().toUpperCase() ?? "");
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
   const [explanation, setExplanation] = useState<AnalysisExplanation | null>(null);
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
@@ -46,7 +46,10 @@ export default function ResearchPage() {
   const [error, setError] = useState<string | null>(null);
 
   const latest = useMemo(
-    () => runs.find((run) => run.ticker === ticker.toUpperCase()) ?? runs[0],
+    () => {
+      const normalized = ticker.trim().toUpperCase();
+      return normalized ? runs.find((run) => run.ticker === normalized) : undefined;
+    },
     [runs, ticker]
   );
 
@@ -72,12 +75,10 @@ export default function ResearchPage() {
   );
 
   async function refresh(targetTicker = ticker) {
-    const normalized = targetTicker.trim().toUpperCase() || "AAPL";
+    const normalized = targetTicker.trim().toUpperCase();
     try {
-      const [nextRuns, nextContext] = await Promise.all([
-        api("/analysis-runs", z.array(analysisRunSchema)),
-        api(`/stocks/${encodeURIComponent(normalized)}/context`, marketContextSchema)
-      ]);
+      const nextRuns = await api("/analysis-runs", z.array(analysisRunSchema));
+      const nextContext = normalized ? await api(`/stocks/${encodeURIComponent(normalized)}/context`, marketContextSchema) : null;
       setRuns(nextRuns);
       setMarketContext(nextContext);
       setError(null);
@@ -129,13 +130,17 @@ export default function ResearchPage() {
               id="research-ticker"
               value={ticker}
               onChange={(event) => setTicker(event.target.value.toUpperCase())}
+              placeholder="Ticker"
               className="h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95"
             />
           </label>
-          <PixelButton tone="magic" glow className="self-end" onClick={() => void refresh(ticker)}>
-            Load Evidence
+          <PixelButton tone="magic" glow className="self-end" onClick={() => void refresh(ticker)} disabled={!ticker.trim()}>
+            {ticker.trim() ? "Load Evidence" : "Choose Symbol"}
           </PixelButton>
         </div>
+        <p className="mt-3 text-xs leading-5 text-slate-600">
+          Evidence loads only after a ticker is entered, so the room starts without a built-in stock opinion.
+        </p>
       </PixelCard>
 
       {error ? <p className="glass-panel rounded-[8px] border-red-200/80 bg-red-100/80 p-3 text-sm text-red-950">{error}</p> : null}

@@ -11,7 +11,7 @@ type WatchlistItem = z.infer<typeof watchlistItemSchema>;
 type Trade = z.infer<typeof tradeSchema>;
 
 export default function HistoryPage() {
-  const [ticker, setTicker] = useState("AAPL");
+  const [ticker, setTicker] = useState("");
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -34,9 +34,14 @@ export default function HistoryPage() {
   }
 
   async function addWatchlist() {
+    const normalized = ticker.trim().toUpperCase();
+    if (!normalized) {
+      setError("Enter a ticker before adding it to your watchlist.");
+      return;
+    }
     const item = await api("/watchlist", watchlistItemSchema, {
       method: "POST",
-      body: JSON.stringify({ ticker: ticker.trim().toUpperCase() || "AAPL" })
+      body: JSON.stringify({ ticker: normalized })
     });
     setWatchlist((items) => [item, ...items.filter((x) => x.ticker !== item.ticker)]);
   }
@@ -68,6 +73,7 @@ export default function HistoryPage() {
             <input
               value={ticker}
               onChange={(event) => setTicker(event.target.value.toUpperCase())}
+              placeholder="Ticker"
               className="h-10 rounded-[8px] border border-white/70 bg-white/70 px-2 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_10px_24px_rgba(15,23,42,0.07)] outline-none backdrop-blur focus:bg-white/95"
               aria-label="Ticker to add"
             />

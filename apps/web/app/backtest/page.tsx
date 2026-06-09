@@ -11,13 +11,17 @@ type BacktestResult = z.infer<typeof backtestResultSchema>;
 
 export default function BacktestPage() {
   const searchParams = useSearchParams();
-  const [ticker, setTicker] = useState(searchParams.get("ticker")?.toUpperCase() ?? "AAPL");
+  const [ticker, setTicker] = useState(searchParams.get("ticker")?.trim().toUpperCase() ?? "");
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function runBacktest() {
-    const normalized = ticker.trim().toUpperCase() || "AAPL";
+    const normalized = ticker.trim().toUpperCase();
+    if (!normalized) {
+      setError("Enter a ticker before running a replay.");
+      return;
+    }
     setIsRunning(true);
     try {
       const to = new Date();
@@ -50,6 +54,7 @@ export default function BacktestPage() {
               id="backtest-ticker"
               value={ticker}
               onChange={(event) => setTicker(event.target.value.toUpperCase())}
+              placeholder="Ticker"
               className="h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95"
             />
           </label>
@@ -74,7 +79,7 @@ export default function BacktestPage() {
         <p className="glass-chip mt-3 rounded-[8px] p-2.5 text-xs leading-5 text-slate-700">
           {result
             ? `${result.strategy} ran ${result.trades} simulated trades from ${result.from} to ${result.to}. ${result.dataQuality.messages[0] ?? ""}`
-            : "Run a replay to see simulated P&L, win rate, drawdown, and recommendation accuracy."}
+            : "Enter a ticker to see simulated P&L, win rate, drawdown, and recommendation accuracy. No symbol is selected by default."}
         </p>
       </PixelCard>
     </main>

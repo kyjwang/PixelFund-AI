@@ -19,7 +19,7 @@ export default function ProfilePage() {
   const [tradeCount, setTradeCount] = useState(0);
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
-  const [preferredTicker, setPreferredTicker] = useState("AAPL");
+  const [preferredTicker, setPreferredTicker] = useState("");
   const [avatarColor, setAvatarColor] = useState("#0f8f78");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export default function ProfilePage() {
     setUser(nextUser);
     setName(nextUser?.name ?? "Pixel Trader");
     setTitle(nextUser?.title ?? "Demo Portfolio Captain");
-    setPreferredTicker(nextUser?.preferredTicker ?? "AAPL");
+    setPreferredTicker(nextUser?.preferredTicker ?? "");
     setAvatarColor(nextUser?.avatarColor ?? "#0f8f78");
     void refresh();
   }, []);
@@ -86,7 +86,7 @@ export default function ProfilePage() {
               <StatTile label="Analyses" value={`${completedAnalyses}`} />
               <StatTile label="Trades" value={`${tradeCount}`} />
               <StatTile label="Watchlist" value={`${watchlistCount}`} />
-              <StatTile label="Preferred" value={preferredTicker.toUpperCase()} />
+              <StatTile label="Preferred" value={preferredTicker.trim() ? preferredTicker.toUpperCase() : "Not set"} help="Optional favorite ticker" />
               <StatTile label="Joined" value={joined} />
               <StatTile label="P&L" value={`${formatMoney(portfolio?.totalPnl ?? 0)} (${formatSignedPercent(portfolio?.totalPnlPercent ?? 0)})`} tone={(portfolio?.totalPnl ?? 0) >= 0 ? "good" : "bad"} />
             </div>
@@ -123,6 +123,7 @@ export default function ProfilePage() {
                 id="profile-ticker"
                 value={preferredTicker}
                 onChange={(event) => setPreferredTicker(event.target.value.toUpperCase())}
+                placeholder="Optional"
                 className="h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95"
               />
             </label>

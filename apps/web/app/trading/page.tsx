@@ -41,7 +41,7 @@ const compactInputClass = "h-11 rounded-[8px] border border-white/70 bg-white/70
 
 export default function TradingPage() {
   const searchParams = useSearchParams();
-  const [ticker, setTicker] = useState(searchParams.get("ticker")?.toUpperCase() ?? "AAPL");
+  const [ticker, setTicker] = useState(searchParams.get("ticker")?.trim().toUpperCase() ?? "");
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
   const [explanation, setExplanation] = useState<AnalysisExplanation | null>(null);
@@ -67,20 +67,25 @@ export default function TradingPage() {
   const tickerRef = useRef(ticker);
   const watchlistRef = useRef(watchlist);
 
-  const normalizedTicker = ticker.trim().toUpperCase() || "AAPL";
+  const normalizedTicker = ticker.trim().toUpperCase();
+  const hasTicker = normalizedTicker.length > 0;
 
   async function refresh(targetTicker = normalizedTicker, targetRange = range) {
-    const normalized = targetTicker.trim().toUpperCase() || "AAPL";
+    const normalized = targetTicker.trim().toUpperCase();
     try {
-      const [p, r, c, h, o, t, w] = await Promise.all([
+      const [p, r, o, t, w] = await Promise.all([
         api("/portfolio", portfolioSchema),
         api("/analysis-runs", z.array(analysisRunSchema)),
-        api(`/stocks/${encodeURIComponent(normalized)}/context`, marketContextSchema),
-        api(`/stocks/${encodeURIComponent(normalized)}/history?range=${targetRange}`, stockHistorySchema),
         api("/orders?limit=50", z.array(orderSchema)),
         api("/trades?limit=50", z.array(tradeSchema)),
         api("/watchlist", z.array(watchlistItemSchema))
       ]);
+      const [c, h] = normalized
+        ? await Promise.all([
+            api(`/stocks/${encodeURIComponent(normalized)}/context`, marketContextSchema),
+            api(`/stocks/${encodeURIComponent(normalized)}/history?range=${targetRange}`, stockHistorySchema)
+          ])
+        : [null, null];
       setPortfolio(p);
       setRuns(r);
       setMarketContext(c);
@@ -95,7 +100,7 @@ export default function TradingPage() {
   }
 
   function subscribeTickers(socket: Socket, currentTicker: string, items: WatchlistItem[]) {
-    socket.emit("quote.subscribe", { ticker: currentTicker });
+    if (currentTicker.trim()) socket.emit("quote.subscribe", { ticker: currentTicker.trim().toUpperCase() });
     for (const item of items.slice(0, 12)) socket.emit("quote.subscribe", { ticker: item.ticker });
   }
 
@@ -152,6 +157,15 @@ export default function TradingPage() {
   }, [normalizedTicker, watchlist]);
 
   useEffect(() => {
+    if (normalizedTicker) return;
+    setMarketContext(null);
+    setHistory(null);
+    setOrderPreview(null);
+    setExplanation(null);
+    setQuoteStale(false);
+  }, [normalizedTicker]);
+
+  useEffect(() => {
     const q = ticker.trim();
     if (q.length < 2) {
       setSearchResults([]);
@@ -176,7 +190,7 @@ export default function TradingPage() {
     };
   }, [ticker]);
 
-  const latest = useMemo(() => runs.find((run) => run.ticker === normalizedTicker), [runs, normalizedTicker]);
+  const latest = useMemo(() => (normalizedTicker ? runs.find((run) => run.ticker === normalizedTicker) : undefined), [runs, normalizedTicker]);
 
   useEffect(() => {
     if (!latest?.id) {
@@ -259,6 +273,10 @@ export default function TradingPage() {
   }
 
   async function addWatchlist() {
+    if (!normalizedTicker) {
+      setError("Choose a ticker before adding it to your watchlist.");
+      return;
+    }
     const item = await api("/watchlist", watchlistItemSchema, {
       method: "POST",
       body: JSON.stringify({ ticker: normalizedTicker })
@@ -272,6 +290,10 @@ export default function TradingPage() {
   }
 
   async function submitOrder() {
+    if (!normalizedTicker) {
+      setError("Choose a ticker before creating an order.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       await api("/orders", orderSchema, {
@@ -307,6 +329,7 @@ export default function TradingPage() {
                 id="trading-ticker"
                 value={ticker}
                 onChange={(event) => setTicker(event.target.value.toUpperCase())}
+                placeholder="Search ticker"
                 className={softInputClass}
               />
             </label>
@@ -325,13 +348,16 @@ export default function TradingPage() {
               </div>
             ) : null}
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <PixelButton tone="magic" onClick={() => void refresh(normalizedTicker, range)}>
+              <PixelButton tone="magic" onClick={() => void refresh(normalizedTicker, range)} disabled={!hasTicker}>
                 Refresh
               </PixelButton>
-              <PixelButton tone="good" onClick={() => void addWatchlist()}>
+              <PixelButton tone="good" onClick={() => void addWatchlist()} disabled={!hasTicker}>
                 Watch
               </PixelButton>
             </div>
+            <p className="mt-3 text-xs leading-5 text-slate-600">
+              Pick a symbol first. The terminal does not load a default stock or execute against placeholder data.
+            </p>
           </PixelCard>
 
           <PixelCard title="Watchlist" eyebrow="account scoped">
@@ -352,32 +378,32 @@ export default function TradingPage() {
 
           <PixelCard title="Account" eyebrow="buying power">
             <div className="grid grid-cols-2 gap-2">
-              <StatTile label="Cash" value={formatMoney(portfolio?.cash ?? 0)} />
-              <StatTile label="Equity" value={formatMoney(portfolio?.totalValue ?? 0)} />
-              <StatTile label="Realized" value={formatMoney(portfolio?.realizedPnl ?? 0)} tone={(portfolio?.realizedPnl ?? 0) >= 0 ? "good" : "bad"} />
-              <StatTile label="Unrealized" value={formatMoney(portfolio?.totalUnrealizedPnl ?? 0)} tone={(portfolio?.totalUnrealizedPnl ?? 0) >= 0 ? "good" : "bad"} />
-              <StatTile label="Total P&L" value={`${formatMoney(portfolio?.totalPnl ?? 0)} ${formatSignedPercent(portfolio?.totalPnlPercent ?? 0)}`} tone={(portfolio?.totalPnl ?? 0) >= 0 ? "good" : "bad"} />
-              <StatTile label="Max Exposure" value={concentration ? `${concentration.ticker} ${formatSignedPercent(concentration.portfolioWeight)}` : "0.0%"} />
+              <StatTile label="Cash" value={portfolio ? formatMoney(portfolio.cash) : "--"} help="Uninvested virtual money" />
+              <StatTile label="Equity" value={portfolio ? formatMoney(portfolio.totalValue) : "--"} help="Cash plus positions" />
+              <StatTile label="Realized" value={formatMoney(portfolio?.realizedPnl ?? 0)} tone={(portfolio?.realizedPnl ?? 0) >= 0 ? "good" : "bad"} help="Locked-in gains or losses" />
+              <StatTile label="Unrealized" value={formatMoney(portfolio?.totalUnrealizedPnl ?? 0)} tone={(portfolio?.totalUnrealizedPnl ?? 0) >= 0 ? "good" : "bad"} help="Open position change" />
+              <StatTile label="Total P&L" value={`${formatMoney(portfolio?.totalPnl ?? 0)} ${formatSignedPercent(portfolio?.totalPnlPercent ?? 0)}`} tone={(portfolio?.totalPnl ?? 0) >= 0 ? "good" : "bad"} help="Overall simulator result" />
+              <StatTile label="Max Exposure" value={concentration ? `${concentration.ticker} ${formatSignedPercent(concentration.portfolioWeight)}` : "0.0%"} help="Largest position weight" />
             </div>
           </PixelCard>
         </div>
 
         <div className="grid gap-3">
-          <PixelCard title={`${normalizedTicker} Terminal`} eyebrow="instrument">
+          <PixelCard title={`${normalizedTicker || "No Symbol"} Terminal`} eyebrow="instrument">
             <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-3xl font-semibold leading-8 tracking-normal">{normalizedTicker}</h1>
-                  <StatusBadge value={terminalTradable ? "tradable" : "not tradable"} />
-                  <StatusBadge value={quoteStale ? "stale" : quote?.source ?? "loading"} />
-                  <StatusBadge value={history?.dataQuality.status ?? "loading"} />
+                  <h1 className="text-3xl font-semibold leading-8 tracking-normal">{normalizedTicker || "Choose a symbol"}</h1>
+                  <StatusBadge value={hasTicker ? terminalTradable ? "tradable" : "not tradable" : "waiting"} />
+                  <StatusBadge value={hasTicker ? quoteStale ? "stale" : quote?.source ?? "loading" : "no quote"} />
+                  <StatusBadge value={hasTicker ? history?.dataQuality.status ?? "loading" : "no chart"} />
                 </div>
-                <p className="mt-2 text-4xl font-black leading-none">{quote ? formatMoney(quote.price) : "$0.00"}</p>
+                <p className="mt-2 text-4xl font-black leading-none">{quote ? formatMoney(quote.price) : "--"}</p>
                 <p className="mt-2 text-xs text-slate-600">
-                  {quote ? `${formatSignedPercent(quote.changePercent)} today | updated ${formatTime(quote.updatedAt)} | age ${formatAge(quoteAgeMs)}` : "Loading quote"}
+                  {quote ? `${formatSignedPercent(quote.changePercent)} today | updated ${formatTime(quote.updatedAt)} | age ${formatAge(quoteAgeMs)}` : "No live quote is loaded until you choose a ticker."}
                 </p>
               </div>
-              <Link href={`/?ticker=${encodeURIComponent(normalizedTicker)}`} className="pixel-button rounded-full border border-white/60 bg-white/62 px-3.5 py-2 text-center text-xs font-black uppercase text-slate-800 shadow-[0_12px_28px_rgba(15,23,42,0.1)] transition hover:-translate-y-0.5 hover:bg-white/82">
+              <Link href={normalizedTicker ? `/?ticker=${encodeURIComponent(normalizedTicker)}` : "/"} className="pixel-button rounded-full border border-white/60 bg-white/62 px-3.5 py-2 text-center text-xs font-black uppercase text-slate-800 shadow-[0_12px_28px_rgba(15,23,42,0.1)] transition hover:-translate-y-0.5 hover:bg-white/82">
                 Desk
               </Link>
             </div>
@@ -404,7 +430,7 @@ export default function TradingPage() {
                 </button>
               ))}
             </div>
-            <PriceChart history={history} />
+            <PriceChart history={history} hasTicker={hasTicker} />
           </PixelCard>
 
           <PixelCard title="Blotter" eyebrow="positions / orders / fills / analysis">
@@ -503,9 +529,9 @@ export default function TradingPage() {
               </div>
             ) : null}
             <PixelButton tone={previewSide === "BUY" ? "good" : "warn"} className="mt-3 w-full" onClick={() => void submitOrder()} disabled={!canSubmit}>
-              {isSubmitting ? "Submitting" : orderType === "MARKET" ? `${previewSide} at Market` : `Place ${previewSide} ${orderType}`}
+              {isSubmitting ? "Submitting" : !hasTicker ? "Choose Symbol" : orderType === "MARKET" ? `${previewSide} at Market` : `Place ${previewSide} ${orderType}`}
             </PixelButton>
-            {!terminalTradable ? <p className="mt-3 rounded-[8px] border border-red-200/80 bg-red-100/85 p-2 text-xs font-semibold text-red-950">Order entry is disabled until quote and chart data are live and fresh.</p> : null}
+            {!terminalTradable ? <p className="mt-3 rounded-[8px] border border-red-200/80 bg-red-100/85 p-2 text-xs font-semibold text-red-950">{hasTicker ? "Order entry is disabled until quote and chart data are live and fresh." : "Choose a ticker to preview an order. The simulator will not use a default symbol."}</p> : null}
           </PixelCard>
 
           <PixelCard title="Open Risk" eyebrow="guardrails">
@@ -526,9 +552,15 @@ export default function TradingPage() {
   );
 }
 
-function PriceChart({ history }: { history: StockHistory | null }) {
+function PriceChart({ history, hasTicker }: { history: StockHistory | null; hasTicker: boolean }) {
   const candles = history?.candles ?? [];
-  if (candles.length === 0) return <div className="glass-chip grid h-[320px] place-items-center rounded-[8px] text-xs text-slate-600">No chart candles available.</div>;
+  if (candles.length === 0) {
+    return (
+      <div className="glass-chip grid h-[320px] place-items-center rounded-[8px] px-4 text-center text-xs leading-5 text-slate-600">
+        {hasTicker ? "No chart candles available for this symbol yet." : "Choose a ticker to load price history. No chart is preloaded by default."}
+      </div>
+    );
+  }
 
   const width = 900;
   const height = 320;

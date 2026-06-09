@@ -44,7 +44,7 @@ type Trade = z.infer<typeof tradeSchema>;
 
 export default function HomePage() {
   const searchParams = useSearchParams();
-  const [ticker, setTicker] = useState(searchParams.get("ticker")?.toUpperCase() ?? "AAPL");
+  const [ticker, setTicker] = useState(searchParams.get("ticker")?.trim().toUpperCase() ?? "");
   const [searchResults, setSearchResults] = useState<Array<{ symbol: string; description: string }>>([]);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [runs, setRuns] = useState<AnalysisRun[]>([]);
@@ -64,21 +64,23 @@ export default function HomePage() {
   const tickerRef = useRef(ticker);
   const watchlistRef = useRef(watchlist);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedTicker = ticker.trim().toUpperCase();
+  const hasTicker = selectedTicker.length > 0;
 
   async function refresh(targetTicker = tickerRef.current) {
-    const normalized = targetTicker.trim().toUpperCase() || "AAPL";
+    const normalized = targetTicker.trim().toUpperCase();
     try {
-      const [p, r, c, w, t] = await Promise.all([
+      const [p, r, w, t] = await Promise.all([
         api("/portfolio", portfolioSchema),
         api("/analysis-runs", z.array(analysisRunSchema)),
-        api(`/stocks/${encodeURIComponent(normalized)}/context`, marketContextSchema),
         api("/watchlist", z.array(watchlistItemSchema)),
         api("/trades?limit=20", z.array(tradeSchema))
       ]);
+      const c = normalized ? await api(`/stocks/${encodeURIComponent(normalized)}/context`, marketContextSchema) : null;
       setPortfolio(p);
       setRuns(r);
       setMarketContext(c);
-      setQuote(c.quote);
+      setQuote(c?.quote ?? null);
       setWatchlist(w);
       setTrades(t);
       setError(null);
@@ -96,7 +98,7 @@ export default function HomePage() {
   }
 
   function subscribeTickers(socket: Socket, currentTicker: string, items: WatchlistItem[]) {
-    socket.emit("quote.subscribe", { ticker: currentTicker });
+    if (currentTicker.trim()) socket.emit("quote.subscribe", { ticker: currentTicker.trim().toUpperCase() });
     for (const item of items) socket.emit("quote.subscribe", { ticker: item.ticker });
   }
 
@@ -202,8 +204,8 @@ export default function HomePage() {
   }, [ticker, watchlist]);
 
   const latest = useMemo(
-    () => runs.find((run) => run.ticker === ticker.toUpperCase()) ?? runs[0],
-    [runs, ticker]
+    () => (selectedTicker ? runs.find((run) => run.ticker === selectedTicker) : undefined),
+    [runs, selectedTicker]
   );
 
   useEffect(() => {
@@ -265,11 +267,16 @@ export default function HomePage() {
     const normalized = symbol.toUpperCase();
     setTicker(normalized);
     setSearchResults([]);
+    setQuoteStale(false);
     await refresh(normalized);
   }
 
   async function runAnalysis(targetTicker = tickerRef.current) {
-    const normalized = targetTicker.trim().toUpperCase() || "AAPL";
+    const normalized = targetTicker.trim().toUpperCase();
+    if (!normalized) {
+      setError("Choose a ticker before asking the AI team.");
+      return;
+    }
     setTicker(normalized);
     setIsAnalyzing(true);
     setHasAskedTeam(true);
@@ -323,6 +330,9 @@ export default function HomePage() {
   const terminalConfidence =
     typeof selected?.confidence === "number" ? Math.round(selected.confidence * 100) : selectedGameAgent.confidence;
   const agentAnalysisText =
+    !hasTicker
+      ? "Choose a ticker to load market data and ask the AI office for a fresh analysis."
+      :
     selected?.summary ??
     selectedExplanation?.summary ??
     "Run an analysis to load backend output for this agent.";
@@ -347,7 +357,7 @@ export default function HomePage() {
                 <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-700">{APP_DISCLAIMER}</p>
               </div>
               <Link
-                href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`}
+                href={selectedTicker ? `/trading?ticker=${encodeURIComponent(selectedTicker)}` : "/trading"}
                 className="pixel-button rounded-full border border-emerald-300/60 bg-[linear-gradient(135deg,#0f8f78,#2f6df6)] px-3.5 py-2 text-center text-xs font-black uppercase text-white shadow-[0_14px_32px_rgba(15,143,120,0.18)] transition hover:-translate-y-0.5"
               >
                 Open Trading
@@ -355,11 +365,11 @@ export default function HomePage() {
             </div>
             <div className="mt-4">
               <PortfolioHud
-                cash={formatMoney(portfolio?.cash ?? 10000)}
-                portfolioValue={formatMoney(accountValue || 0)}
+                cash={portfolio ? formatMoney(portfolio.cash) : "--"}
+                portfolioValue={portfolio ? formatMoney(accountValue || 0) : "--"}
                 pnlPercent={formatSignedPercent(pnlPercent)}
                 hitRate={`${Math.max(0, Math.round((completedAnalyses / Math.max(1, runs.length)) * 100))}%`}
-                selectedDesk={selectedGameAgent.label}
+                selectedDesk={hasTicker ? selectedGameAgent.label : "None"}
                 level={xpLevel}
                 streak={streak}
                 mood={portfolioMood}
@@ -375,6 +385,7 @@ export default function HomePage() {
               onTickerChange={setTicker}
               onSelectTicker={(symbol) => void selectTicker(symbol)}
               onAnalyze={() => void runAnalysis()}
+              analyzeDisabled={!hasTicker}
             />
             <MissionPanel analyzedCount={completedAnalyses} watchlistCount={watchlist.length} askedTeam={hasAskedTeam} />
           </div>
@@ -394,28 +405,34 @@ export default function HomePage() {
           />
 
           <div className="grid gap-4">
-            <PixelCard title="Market Tape" eyebrow={ticker.toUpperCase()}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-3xl font-bold leading-none">{quote ? formatMoney(quote.price) : "$0.00"}</p>
-                  <p className="mt-2 text-xs text-slate-600">Source: {quote?.source ?? "loading"}</p>
-                </div>
-                <StatusBadge value={quote ? formatSignedPercent(quote.changePercent) : "0.0%"} />
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <Metric label="Quality" value={`${dataQualityStatus} ${Math.round(dataQuality * 100)}%`} tone={dataQualityStatus === "LIVE" ? "good" : dataQualityStatus === "UNSUPPORTED" ? "bad" : undefined} />
-                <Metric label="Feed" value={quoteStale ? "Stale" : "Live"} tone={quoteStale ? "bad" : "good"} />
-              </div>
+            <PixelCard title="Market Tape" eyebrow={selectedTicker || "no symbol"}>
+              {hasTicker ? (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-3xl font-bold leading-none">{quote ? formatMoney(quote.price) : "--"}</p>
+                      <p className="mt-2 text-xs text-slate-600">Source: {quote?.source ?? "waiting for market data"}</p>
+                    </div>
+                    <StatusBadge value={quote ? formatSignedPercent(quote.changePercent) : "waiting"} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <Metric label="Quality" value={`${dataQualityStatus} ${Math.round(dataQuality * 100)}%`} tone={dataQualityStatus === "LIVE" ? "good" : dataQualityStatus === "UNSUPPORTED" ? "bad" : undefined} help="How trustworthy the loaded market data is." />
+                    <Metric label="Feed" value={quoteStale ? "Stale" : "Live"} tone={quoteStale ? "bad" : "good"} help="Whether the latest quote can be used." />
+                  </div>
+                </>
+              ) : (
+                <EmptyState title="No ticker selected" detail="Search for a symbol to load its quote, data quality, and AI analysis. The office starts blank so no stock is implied." />
+              )}
             </PixelCard>
 
             <PixelCard title="Manager Summary" eyebrow="portfolio manager + team lead">
               <div className="grid gap-2 text-xs">
                 <StatusBadge value={`Final ${finalRec}`} />
                 <p className="glass-chip rounded-[8px] p-2.5 leading-5">
-                  {portfolioManager?.summary ?? latest?.finalSummary ?? "Ask the AI team to receive the Portfolio Manager summary for this ticker."}
+                  {hasTicker ? portfolioManager?.summary ?? latest?.finalSummary ?? "Ask the AI team to receive the Portfolio Manager summary for this ticker." : "Choose a ticker to start a fresh analysis. Nothing is preloaded for a new session."}
                 </p>
                 <p className="glass-chip rounded-[8px] p-2.5 leading-5">
-                  {teamLead?.summary ?? "Team Lead will organize the committee's strongest points once the team has completed its review."}
+                  {hasTicker ? teamLead?.summary ?? "Team Lead will organize the committee's strongest points once the team has completed its review." : "After analysis, this area explains how the specialist opinions were combined."}
                 </p>
               </div>
             </PixelCard>
@@ -450,7 +467,7 @@ export default function HomePage() {
         <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]" aria-label="Selected agent details">
           <AgentIntroduction agent={selectedGameAgent} status={terminalStatus} signal={String(terminalSignal)} confidence={terminalConfidence} />
           <AnalysisOutput
-            ticker={ticker.toUpperCase()}
+            ticker={selectedTicker || "NO SYMBOL"}
             role={selectedGameAgent.role}
             status={terminalStatus}
             recommendation={selected?.recommendation ?? selectedExplanation?.recommendation ?? null}
@@ -461,21 +478,21 @@ export default function HomePage() {
         </section>
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5" aria-label="More rooms">
-          <RoomLink href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Trading Terminal" detail="Live quote gate, account panels, watchlist, open orders, and fills." />
-          <RoomLink href={`/research?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Research Room" detail="Agent debate, evidence, caveats, and team-meeting notes." />
+          <RoomLink href={selectedTicker ? `/trading?ticker=${encodeURIComponent(selectedTicker)}` : "/trading"} title="Trading Terminal" detail="Live quote gate, account panels, watchlist, open orders, and fills." />
+          <RoomLink href={selectedTicker ? `/research?ticker=${encodeURIComponent(selectedTicker)}` : "/research"} title="Research Room" detail="Agent debate, evidence, caveats, and team-meeting notes." />
           <RoomLink href="/history" title="History Vault" detail="Watchlist, recommendations, and account-scoped fill history." />
-          <RoomLink href={`/backtest?ticker=${encodeURIComponent(ticker.toUpperCase())}`} title="Backtest Lab" detail="Replay the manager signal against historical closes." />
+          <RoomLink href={selectedTicker ? `/backtest?ticker=${encodeURIComponent(selectedTicker)}` : "/backtest"} title="Backtest Lab" detail="Replay the manager signal against historical closes." />
           <RoomLink href="/system" title="System Console" detail="API, database, Redis, provider, and runtime readiness." />
         </section>
       </div>
 
       <div className="glass-panel fixed inset-x-2 bottom-2 z-30 rounded-[8px] p-2 md:hidden" role="toolbar" aria-label="Office quick actions">
         <div className="grid grid-cols-2 gap-2">
-          <PixelButton tone="magic" glow className="px-1 text-[10px]" onClick={() => void runAnalysis()}>
-            Analyze
+          <PixelButton tone="magic" glow className="px-1 text-[10px]" onClick={() => void runAnalysis()} disabled={!hasTicker}>
+            {hasTicker ? "Analyze" : "Choose Symbol"}
           </PixelButton>
           <Link
-            href={`/trading?ticker=${encodeURIComponent(ticker.toUpperCase())}`}
+            href={selectedTicker ? `/trading?ticker=${encodeURIComponent(selectedTicker)}` : "/trading"}
             className="pixel-button min-h-10 rounded-full border border-emerald-200/80 bg-emerald-100/80 px-1 py-2 text-center text-[10px] font-black uppercase text-emerald-950 shadow-[0_12px_26px_rgba(15,23,42,0.1)]"
           >
             Trade
@@ -566,12 +583,22 @@ function AnalysisOutput({
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
+function Metric({ label, value, tone, help }: { label: string; value: string; tone?: "good" | "bad"; help?: string }) {
   const toneClass = tone === "good" ? "text-emerald-800" : tone === "bad" ? "text-red-800" : "text-slate-950";
   return (
     <div className="glass-chip rounded-[8px] px-2.5 py-2">
       <p className="text-[10px] uppercase text-slate-500">{label}</p>
       <p className={`mt-1 truncate text-xs font-semibold ${toneClass}`}>{value}</p>
+      {help ? <p className="mt-1 text-[10px] leading-4 text-slate-500">{help}</p> : null}
+    </div>
+  );
+}
+
+function EmptyState({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="glass-chip rounded-[8px] p-3 text-sm">
+      <p className="font-semibold text-slate-950">{title}</p>
+      <p className="mt-2 text-xs leading-5 text-slate-600">{detail}</p>
     </div>
   );
 }
