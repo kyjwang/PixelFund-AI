@@ -14,10 +14,15 @@ export class AnalysisService {
     @InjectQueue("analysis") private readonly queue: Queue
   ) {}
 
-  async createRun(ticker: string, idempotencyKey?: string) {
+  private accountKey(ownerKey?: string) {
+    return (ownerKey ?? "demo").trim().slice(0, 64) || "demo";
+  }
+
+  async createRun(ticker: string, idempotencyKey?: string, ownerKey?: string) {
+    const key = this.accountKey(ownerKey);
     if (idempotencyKey) {
       const existing = await this.prisma.analysisRun.findFirst({
-        where: { idempotencyKey, ticker },
+        where: { idempotencyKey, ticker, ownerKey: key },
         include: { recommendations: true },
         orderBy: { createdAt: "desc" }
       });
@@ -29,7 +34,7 @@ export class AnalysisService {
 
     const freshnessWindowMs = 60_000;
     const recent = await this.prisma.analysisRun.findFirst({
-      where: { ticker, createdAt: { gte: new Date(Date.now() - freshnessWindowMs) } },
+      where: { ticker, ownerKey: key, createdAt: { gte: new Date(Date.now() - freshnessWindowMs) } },
       include: { recommendations: true },
       orderBy: { createdAt: "desc" }
     });
@@ -40,6 +45,7 @@ export class AnalysisService {
 
     const run = await this.prisma.analysisRun.create({
       data: {
+        ownerKey: key,
         ticker,
         idempotencyKey,
         status: "PENDING",
@@ -136,17 +142,43 @@ export class AnalysisService {
     });
   }
 
-  async listRuns() {
+  async listRuns(ownerKey?: string) {
     return this.prisma.analysisRun.findMany({
+      where: { ownerKey: this.accountKey(ownerKey) },
       orderBy: { createdAt: "desc" },
       include: { recommendations: true },
       take: 20
     });
   }
 
-  async explainRun(id: string) {
-    const run = await this.prisma.analysisRun.findUnique({
-      where: { id },
+  async clearRuns(ownerKey?: string) {
+    const key = this.accountKey(ownerKey);
+    return this.prisma.$transaction(async (tx) => {
+      const runs = await tx.analysisRun.findMany({
+        where: { ownerKey: key },
+        select: { id: true }
+      });
+      const runIds = runs.map((run) => run.id);
+      const deletedAgentResults =
+        runIds.length > 0
+          ? await tx.agentResult.deleteMany({
+              where: { analysisRunId: { in: runIds } }
+            })
+          : { count: 0 };
+      const deletedAnalysisRuns = await tx.analysisRun.deleteMany({
+        where: { ownerKey: key }
+      });
+
+      return {
+        deletedAnalysisRuns: deletedAnalysisRuns.count,
+        deletedAgentResults: deletedAgentResults.count
+      };
+    });
+  }
+
+  async explainRun(id: string, ownerKey?: string) {
+    const run = await this.prisma.analysisRun.findFirst({
+      where: { id, ownerKey: this.accountKey(ownerKey) },
       include: { recommendations: true }
     });
     if (!run) throw new NotFoundException("Analysis run not found");

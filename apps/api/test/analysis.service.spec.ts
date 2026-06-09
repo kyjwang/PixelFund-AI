@@ -53,4 +53,104 @@ describe("analysis service queue handoff", () => {
       })
     });
   });
+
+  test("creates and reuses analysis runs inside the requested owner scope", async () => {
+    const created = { id: "run-owner-a", ticker: "NVDA", status: "PENDING", recommendations: [] };
+    const prisma = {
+      analysisRun: {
+        findFirst: jest.fn(async () => null),
+        create: jest.fn(async () => created),
+        update: jest.fn()
+      }
+    };
+    const queue = {
+      getJob: jest.fn(async () => ({ id: "run-owner-a" })),
+      add: jest.fn()
+    };
+    const service = new AnalysisService(prisma as any, { emit: jest.fn() } as any, queue as any);
+
+    await expect(service.createRun("NVDA", "idem-1", "account-a")).resolves.toBe(created);
+
+    expect(prisma.analysisRun.findFirst).toHaveBeenNthCalledWith(1, {
+      where: { idempotencyKey: "idem-1", ticker: "NVDA", ownerKey: "account-a" },
+      include: { recommendations: true },
+      orderBy: { createdAt: "desc" }
+    });
+    expect(prisma.analysisRun.findFirst).toHaveBeenNthCalledWith(2, {
+      where: {
+        ticker: "NVDA",
+        ownerKey: "account-a",
+        createdAt: { gte: expect.any(Date) }
+      },
+      include: { recommendations: true },
+      orderBy: { createdAt: "desc" }
+    });
+    expect(prisma.analysisRun.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ ownerKey: "account-a", ticker: "NVDA" })
+      })
+    );
+  });
+
+  test("lists analysis runs inside the requested owner scope", async () => {
+    const prisma = {
+      analysisRun: {
+        findMany: jest.fn(async () => [])
+      }
+    };
+    const service = new AnalysisService(prisma as any, { emit: jest.fn() } as any, {} as any);
+
+    await expect(service.listRuns("account-b")).resolves.toEqual([]);
+
+    expect(prisma.analysisRun.findMany).toHaveBeenCalledWith({
+      where: { ownerKey: "account-b" },
+      orderBy: { createdAt: "desc" },
+      include: { recommendations: true },
+      take: 20
+    });
+  });
+
+  test("clears only analysis runs and agent results for the requested owner scope", async () => {
+    const prisma = {
+      $transaction: jest.fn(async (callback: any) =>
+        callback({
+          analysisRun: {
+            findMany: jest.fn(async () => [{ id: "run-a" }, { id: "run-b" }]),
+            deleteMany: jest.fn(async () => ({ count: 2 }))
+          },
+          agentResult: {
+            deleteMany: jest.fn(async () => ({ count: 30 }))
+          }
+        })
+      )
+    };
+    const service = new AnalysisService(prisma as any, { emit: jest.fn() } as any, {} as any);
+
+    await expect(service.clearRuns("account-a")).resolves.toEqual({
+      deletedAnalysisRuns: 2,
+      deletedAgentResults: 30
+    });
+
+    const tx = (prisma.$transaction as jest.Mock).mock.calls[0][0] as (client: unknown) => Promise<unknown>;
+    const txClient = {
+      analysisRun: {
+        findMany: jest.fn(async () => [{ id: "run-a" }, { id: "run-b" }]),
+        deleteMany: jest.fn(async () => ({ count: 2 }))
+      },
+      agentResult: {
+        deleteMany: jest.fn(async () => ({ count: 30 }))
+      }
+    };
+    await tx(txClient);
+    expect(txClient.analysisRun.findMany).toHaveBeenCalledWith({
+      where: { ownerKey: "account-a" },
+      select: { id: true }
+    });
+    expect(txClient.agentResult.deleteMany).toHaveBeenCalledWith({
+      where: { analysisRunId: { in: ["run-a", "run-b"] } }
+    });
+    expect(txClient.analysisRun.deleteMany).toHaveBeenCalledWith({
+      where: { ownerKey: "account-a" }
+    });
+  });
 });

@@ -107,6 +107,70 @@ describe("http integration", () => {
     expect(parsedExplanation.agents.find((agent) => agent.agentType === "PORTFOLIO_MANAGER")?.baseWeight).toBe(0);
   });
 
+  test("scopes analysis history by demo account header", async () => {
+    const accountA = "analysis-account-a";
+    const accountB = "analysis-account-b";
+
+    const runA = await request(server)
+      .post("/analysis-runs")
+      .set("x-demo-user-id", accountA)
+      .send({ ticker: "MSFT", idempotencyKey: "analysis-a-msft" })
+      .expect(201);
+    await request(server)
+      .post("/analysis-runs")
+      .set("x-demo-user-id", accountB)
+      .send({ ticker: "AAPL", idempotencyKey: "analysis-b-aapl" })
+      .expect(201);
+
+    const stored = await prisma.$queryRawUnsafe<Array<{ ownerKey: string }>>(
+      `SELECT "ownerKey" FROM "AnalysisRun" WHERE id = $1`,
+      runA.body.data.id
+    );
+    expect(stored[0]?.ownerKey).toBe(accountA);
+
+    const listA = await request(server).get("/analysis-runs").set("x-demo-user-id", accountA).expect(200);
+    const listB = await request(server).get("/analysis-runs").set("x-demo-user-id", accountB).expect(200);
+
+    expect(listA.body.data.map((run: any) => run.ticker)).toEqual(["MSFT"]);
+    expect(listB.body.data.map((run: any) => run.ticker)).toEqual(["AAPL"]);
+  });
+
+  test("clears only the current account analysis history", async () => {
+    const accountA = "clear-analysis-a";
+    const accountB = "clear-analysis-b";
+
+    const runA = await request(server)
+      .post("/analysis-runs")
+      .set("x-demo-user-id", accountA)
+      .send({ ticker: "MSFT", idempotencyKey: "clear-a-msft" })
+      .expect(201);
+    await request(server)
+      .post("/analysis-runs")
+      .set("x-demo-user-id", accountB)
+      .send({ ticker: "AAPL", idempotencyKey: "clear-b-aapl" })
+      .expect(201);
+    await request(server).post("/watchlist").set("x-demo-user-id", accountA).send({ ticker: "NVDA" }).expect(201);
+    await request(server).post("/trades").set("x-demo-user-id", accountA).send({ ticker: "MSFT", side: "BUY", quantity: 1 }).expect(201);
+
+    const cleared = await request(server).delete("/analysis-runs").set("x-demo-user-id", accountA).expect(200);
+
+    expect(cleared.body.data.deletedAnalysisRuns).toBe(1);
+    expect(cleared.body.data.deletedAgentResults).toBeGreaterThan(0);
+
+    const agentResults = await prisma.agentResult.findMany({ where: { analysisRunId: runA.body.data.id } });
+    expect(agentResults).toEqual([]);
+
+    const analysisA = await request(server).get("/analysis-runs").set("x-demo-user-id", accountA).expect(200);
+    const analysisB = await request(server).get("/analysis-runs").set("x-demo-user-id", accountB).expect(200);
+    const watchlistA = await request(server).get("/watchlist").set("x-demo-user-id", accountA).expect(200);
+    const tradesA = await request(server).get("/trades").set("x-demo-user-id", accountA).expect(200);
+
+    expect(analysisA.body.data).toEqual([]);
+    expect(analysisB.body.data.map((run: any) => run.ticker)).toEqual(["AAPL"]);
+    expect(watchlistA.body.data.map((item: any) => item.ticker)).toEqual(["NVDA"]);
+    expect(tradesA.body.data.map((trade: any) => trade.ticker)).toEqual(["MSFT"]);
+  });
+
   test("trade updates portfolio accounting", async () => {
     await request(server).post("/trades").send({ ticker: "MSFT", side: "BUY", quantity: 2 }).expect(201);
     const afterBuy = await request(server).get("/portfolio").expect(200);

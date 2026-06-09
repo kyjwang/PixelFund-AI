@@ -138,6 +138,7 @@ model WatchlistItem {
 
 model AnalysisRun {
   id              String         @id @default(cuid())
+  ownerKey        String         @default("demo")
   ticker          String
   idempotencyKey  String?
   status          AgentStatus    @default(PENDING)
@@ -148,6 +149,8 @@ model AnalysisRun {
   updatedAt       DateTime       @updatedAt
   recommendations AgentResult[]
 
+  @@index([ownerKey, createdAt])
+  @@index([ownerKey, ticker, createdAt])
   @@index([ticker, createdAt])
   @@index([idempotencyKey])
 }
