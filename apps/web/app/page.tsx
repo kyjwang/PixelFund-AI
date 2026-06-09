@@ -30,7 +30,7 @@ import {
 } from "../components/GameUI";
 import { gameAgents, PixelOffice } from "../components/PixelOffice";
 import { api } from "../lib/api";
-import { shouldPollAnalysisRun } from "../lib/analysis-polling";
+import { getAnalysisProgress, shouldPollAnalysisRun } from "../lib/analysis-polling";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
 const stockSearchSchema = z.array(z.object({ symbol: z.string(), description: z.string() }));
@@ -253,6 +253,25 @@ export default function HomePage() {
     () => (selectedTicker ? runs.find((run) => run.ticker === selectedTicker) : undefined),
     [runs, selectedTicker]
   );
+  const analysisProgress = useMemo(() => getAnalysisProgress(latest), [latest]);
+  const analysisIsActive = isAnalyzing || analysisProgress.isActive;
+  const recommendationRevision = useMemo(
+    () =>
+      (latest?.recommendations ?? [])
+        .map((rec) => `${rec.agentType}:${rec.status}:${rec.updatedAt ?? ""}:${rec.recommendation ?? ""}`)
+        .join("|"),
+    [latest?.recommendations]
+  );
+
+  useEffect(() => {
+    if (!latest?.id) return;
+    if (shouldPollAnalysisRun(latest.status)) {
+      setIsAnalyzing(true);
+      if (!analysisPollTimerRef.current) pollAnalysisRun(latest.id, latest.ticker);
+      return;
+    }
+    setIsAnalyzing(false);
+  }, [latest?.id, latest?.status, latest?.ticker]);
 
   useEffect(() => {
     if (!latest?.id) {
@@ -268,7 +287,7 @@ export default function HomePage() {
       .catch(() => setAnalysisExplanation(null));
 
     return () => controller.abort();
-  }, [latest?.id, latest?.updatedAt]);
+  }, [latest?.id, latest?.updatedAt, recommendationRevision]);
 
   const selected = useMemo(
     () => latest?.recommendations?.find((r) => r.agentType === selectedAgent),
@@ -432,11 +451,12 @@ export default function HomePage() {
             <StockSearchPanel
               ticker={ticker}
               results={searchResults}
-              isAnalyzing={isAnalyzing}
+              isAnalyzing={analysisIsActive}
+              analysisProgress={latest ? analysisProgress : null}
               onTickerChange={setTicker}
               onSelectTicker={(symbol) => void selectTicker(symbol)}
               onAnalyze={() => void runAnalysis()}
-              analyzeDisabled={!hasTicker}
+              analyzeDisabled={!hasTicker || analysisProgress.isActive}
             />
             <MissionPanel analyzedCount={completedAnalyses} watchlistCount={watchlist.length} askedTeam={hasAskedTeam} />
           </div>
@@ -539,8 +559,8 @@ export default function HomePage() {
 
       <div className="glass-panel fixed inset-x-2 bottom-2 z-30 rounded-[8px] p-2 md:hidden" role="toolbar" aria-label="Office quick actions">
         <div className="grid grid-cols-2 gap-2">
-          <PixelButton tone="magic" glow className="px-1 text-[10px]" onClick={() => void runAnalysis()} disabled={!hasTicker}>
-            {hasTicker ? "Analyze" : "Choose Symbol"}
+          <PixelButton tone="magic" glow className="px-1 text-[10px]" onClick={() => void runAnalysis()} disabled={!hasTicker || analysisIsActive}>
+            {analysisIsActive ? `${analysisProgress.percent}%` : hasTicker ? "Analyze" : "Choose Symbol"}
           </PixelButton>
           <Link
             href={selectedTicker ? `/trading?ticker=${encodeURIComponent(selectedTicker)}` : "/trading"}

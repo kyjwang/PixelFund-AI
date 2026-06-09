@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { AnalysisProgress } from "../lib/analysis-polling";
 
 type Tone = "neutral" | "good" | "bad" | "warn" | "magic";
 
@@ -284,6 +285,7 @@ export function StockSearchPanel({
   ticker,
   results,
   isAnalyzing,
+  analysisProgress,
   onTickerChange,
   onSelectTicker,
   onAnalyze,
@@ -292,11 +294,15 @@ export function StockSearchPanel({
   ticker: string;
   results: Array<{ symbol: string; description: string }>;
   isAnalyzing: boolean;
+  analysisProgress?: AnalysisProgress | null;
   onTickerChange: (value: string) => void;
   onSelectTicker: (symbol: string) => void;
   onAnalyze: () => void;
   analyzeDisabled?: boolean;
 }) {
+  const showProgress = Boolean(analysisProgress && ticker.trim());
+  const progressTone = analysisProgress?.failed ? "text-red-700" : analysisProgress?.isActive ? "text-[color:var(--pf-accent)]" : "text-slate-600";
+
   return (
     <PixelCard title="Stock Scanner" eyebrow="mission control">
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
@@ -328,9 +334,36 @@ export function StockSearchPanel({
           ) : null}
         </div>
         <PixelButton tone="magic" glow className="self-end" onClick={onAnalyze} disabled={isAnalyzing || analyzeDisabled}>
-          {isAnalyzing ? "Thinking..." : ticker.trim() ? "Ask AI Team" : "Choose Symbol"}
+          {isAnalyzing && analysisProgress ? `Analyzing ${analysisProgress.percent}%` : isAnalyzing ? "Analyzing..." : ticker.trim() ? "Ask AI Team" : "Choose Symbol"}
         </PixelButton>
       </div>
+      {showProgress && analysisProgress ? (
+        <div className="mt-3 rounded-[8px] border border-white/65 bg-white/58 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]" aria-live="polite">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <p className="font-bold uppercase text-slate-700">AI team progress</p>
+            <p className={`font-pixel text-[10px] ${progressTone}`}>{analysisProgress.etaLabel}</p>
+          </div>
+          <div
+            className="mt-2 h-3 overflow-hidden rounded-full bg-slate-950/10"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={analysisProgress.percent}
+            aria-label={`AI team analysis ${analysisProgress.percent}% complete`}
+          >
+            <div className="h-full rounded-full bg-[linear-gradient(90deg,#0f8f78,#2f6df6)] transition-[width] duration-500" style={{ width: `${analysisProgress.percent}%` }} />
+          </div>
+          <div className="mt-2 grid gap-1 text-xs leading-5 text-slate-600 sm:grid-cols-[1fr_auto]">
+            <p>
+              <span className="font-semibold text-slate-800">{analysisProgress.currentLabel}</span>
+            </p>
+            <p className="font-pixel text-[10px] text-slate-700">
+              {analysisProgress.completed}/{analysisProgress.total} done
+              {analysisProgress.failed > 0 ? `, ${analysisProgress.failed} failed` : ""}
+            </p>
+          </div>
+        </div>
+      ) : null}
       <p className="mt-3 text-xs leading-5 text-slate-600">
         Start with any ticker you want to research. No market price, chart, or recommendation is loaded until a symbol is selected.
       </p>
