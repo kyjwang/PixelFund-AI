@@ -31,21 +31,11 @@ import {
 } from "../components/GameUI";
 import { gameAgents, PixelOffice } from "../components/PixelOffice";
 import { api } from "../lib/api";
+import { buildAnalysisTimelineRows, type AnalysisTimelineRow } from "../lib/analysis-timeline";
 import { getAnalysisProgress, shouldPollAnalysisRun } from "../lib/analysis-polling";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
 const stockSearchSchema = z.array(z.object({ symbol: z.string(), description: z.string() }));
-const meetingSteps = [
-  "Technical Analyst checks price action.",
-  "Fundamentals Analyst reviews valuation.",
-  "News Analyst scans headlines.",
-  "Macro Analyst checks rates and regime.",
-  "Bull Researcher builds the upside case.",
-  "Bear Researcher challenges the setup.",
-  "Trader Agent converts debate into an execution plan.",
-  "Risk Council reviews drawdown exposure.",
-  "Portfolio Manager prepares final weighting."
-];
 
 type Portfolio = z.infer<typeof portfolioSchema>;
 type AnalysisRun = z.infer<typeof analysisRunSchema>;
@@ -70,8 +60,6 @@ export default function HomePage() {
   const [quoteStale, setQuoteStale] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [meetingLog, setMeetingLog] = useState<string[]>([]);
-  const [isMeetingRunning, setIsMeetingRunning] = useState(false);
   const [achievement, setAchievement] = useState<{ title: string; detail: string } | null>(null);
   const [hasAskedTeam, setHasAskedTeam] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -269,6 +257,7 @@ export default function HomePage() {
   );
   const analysisProgress = useMemo(() => getAnalysisProgress(latest), [latest]);
   const analysisIsActive = isAnalyzing || analysisProgress.isActive;
+  const analysisTimelineRows = useMemo(() => buildAnalysisTimelineRows(latest?.recommendations), [latest?.recommendations]);
   const recommendationRevision = useMemo(
     () =>
       (latest?.recommendations ?? [])
@@ -384,19 +373,6 @@ export default function HomePage() {
       clearAnalysisPoll();
       setError(e instanceof Error ? e.message : "Analysis failed");
     }
-  }
-
-  function startTeamMeeting() {
-    if (isMeetingRunning) return;
-    setIsMeetingRunning(true);
-    setMeetingLog([]);
-
-    meetingSteps.forEach((step, idx) => {
-      window.setTimeout(() => {
-        setMeetingLog((items) => [...items, step]);
-        if (idx === meetingSteps.length - 1) setIsMeetingRunning(false);
-      }, idx * 520);
-    });
   }
 
   useEffect(() => {
@@ -606,22 +582,7 @@ export default function HomePage() {
             </div>
           </PixelCard>
 
-          <PixelCard title="Team Meeting" eyebrow="live room log">
-            <PixelButton tone="magic" onClick={startTeamMeeting} disabled={isMeetingRunning}>
-              {isMeetingRunning ? "Meeting Running" : "Start Meeting"}
-            </PixelButton>
-            <div className="mt-3 max-h-72 overflow-auto rounded-[8px] border border-slate-950/10 bg-slate-950/92 p-2 font-mono text-xs text-emerald-100 shadow-inner">
-              {meetingLog.length === 0 ? (
-                <p>Waiting for the team lead...</p>
-              ) : (
-                meetingLog.map((item, idx) => (
-                  <p key={`${item}-${idx}`} className="border-b border-[#14532d] py-1 last:border-b-0">
-                    {idx + 1}. {item}
-                  </p>
-                ))
-              )}
-            </div>
-          </PixelCard>
+          <AnalysisTimelinePanel rows={analysisTimelineRows} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} />
         </section>
 
         <PixelCard title="Evidence Snapshot" eyebrow={marketContext?.dataQuality.status ?? "loading"}>
@@ -746,6 +707,56 @@ function AnalysisOutput({
           </p>
         )}
       </div>
+    </PixelCard>
+  );
+}
+
+function AnalysisTimelinePanel({
+  rows,
+  selectedAgent,
+  onSelectAgent
+}: {
+  rows: AnalysisTimelineRow[];
+  selectedAgent: string;
+  onSelectAgent: (agentType: string) => void;
+}) {
+  return (
+    <PixelCard title="Analysis Timeline" eyebrow="live agent progress">
+      {rows.length === 0 ? (
+        <EmptyState
+          title="No live analysis yet"
+          detail="Ask the AI team for a ticker to see each agent update here as the run moves from pending to final decision."
+        />
+      ) : (
+        <div className="max-h-[34rem] overflow-auto pr-1" aria-live="polite">
+          <div className="grid gap-2">
+            {rows.map((row, idx) => (
+              <button
+                key={`${row.agentType}-${idx}`}
+                type="button"
+                onClick={() => onSelectAgent(row.agentType)}
+                className={cx(
+                  "rounded-[8px] border p-3 text-left shadow-[0_12px_26px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:-translate-y-0.5",
+                  selectedAgent === row.agentType ? "border-emerald-300 bg-emerald-50/86" : "border-white/65 bg-white/58 hover:bg-white/78"
+                )}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.04em] text-slate-900">{row.label}</p>
+                    <p className="mt-1 font-pixel text-[10px] uppercase text-slate-500">Step {idx + 1}</p>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-1.5">
+                    <StatusBadge value={row.status} />
+                    {row.recommendation ? <StatusBadge value={row.recommendation} /> : null}
+                    {row.confidenceLabel ? <StatusBadge value={`${row.confidenceLabel} confidence`} /> : null}
+                  </div>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-700">{row.detail}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </PixelCard>
   );
 }
