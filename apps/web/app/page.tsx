@@ -24,6 +24,7 @@ import {
   PixelButton,
   PixelCard,
   PortfolioHud,
+  StatTile,
   StatusBadge,
   StockSearchPanel,
   TeamDecisionPanel
@@ -34,6 +35,17 @@ import { getAnalysisProgress, shouldPollAnalysisRun } from "../lib/analysis-poll
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
 const stockSearchSchema = z.array(z.object({ symbol: z.string(), description: z.string() }));
+const meetingSteps = [
+  "Technical Analyst checks price action.",
+  "Fundamentals Analyst reviews valuation.",
+  "News Analyst scans headlines.",
+  "Macro Analyst checks rates and regime.",
+  "Bull Researcher builds the upside case.",
+  "Bear Researcher challenges the setup.",
+  "Trader Agent converts debate into an execution plan.",
+  "Risk Council reviews drawdown exposure.",
+  "Portfolio Manager prepares final weighting."
+];
 
 type Portfolio = z.infer<typeof portfolioSchema>;
 type AnalysisRun = z.infer<typeof analysisRunSchema>;
@@ -58,6 +70,8 @@ export default function HomePage() {
   const [quoteStale, setQuoteStale] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [meetingLog, setMeetingLog] = useState<string[]>([]);
+  const [isMeetingRunning, setIsMeetingRunning] = useState(false);
   const [achievement, setAchievement] = useState<{ title: string; detail: string } | null>(null);
   const [hasAskedTeam, setHasAskedTeam] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -302,6 +316,12 @@ export default function HomePage() {
   const selectedExplanation = analysisExplanation?.agents.find((agent) => agent.agentType === selectedAgent);
   const portfolioManager = latest?.recommendations?.find((r) => r.agentType === "PORTFOLIO_MANAGER");
   const teamLead = latest?.recommendations?.find((r) => r.agentType === "TEAM_LEAD");
+  const bullResearcher = latest?.recommendations?.find((r) => r.agentType === "BULL_RESEARCHER");
+  const bearResearcher = latest?.recommendations?.find((r) => r.agentType === "BEAR_RESEARCHER");
+  const traderAgent = latest?.recommendations?.find((r) => r.agentType === "TRADER_AGENT");
+  const riskCouncil = ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"].map((agentType) =>
+    latest?.recommendations?.find((r) => r.agentType === agentType)
+  );
   const completedCommittee = useMemo(
     () => (latest?.recommendations ?? []).filter((r) => r.status === "COMPLETED" && r.agentType !== "PORTFOLIO_MANAGER"),
     [latest]
@@ -364,6 +384,19 @@ export default function HomePage() {
       clearAnalysisPoll();
       setError(e instanceof Error ? e.message : "Analysis failed");
     }
+  }
+
+  function startTeamMeeting() {
+    if (isMeetingRunning) return;
+    setIsMeetingRunning(true);
+    setMeetingLog([]);
+
+    meetingSteps.forEach((step, idx) => {
+      window.setTimeout(() => {
+        setMeetingLog((items) => [...items, step]);
+        if (idx === meetingSteps.length - 1) setIsMeetingRunning(false);
+      }, idx * 520);
+    });
   }
 
   useEffect(() => {
@@ -515,10 +548,10 @@ export default function HomePage() {
               voteText={`${voteMix.BUY} BUY | ${voteMix.HOLD} HOLD | ${voteMix.AVOID} AVOID`}
               caveats={analysisExplanation?.caveats ?? []}
             >
-              {(analysisExplanation?.agents ?? []).filter((agent) => agent.agentType !== "PORTFOLIO_MANAGER").slice(0, 8).map((agent) => (
+              {(analysisExplanation?.agents ?? []).filter((agent) => agent.agentType !== "PORTFOLIO_MANAGER").map((agent) => (
                 <AgentCard
                   key={agent.agentType}
-                  role={agent.role}
+                  role={`${agent.role}${analysisExplanation?.topContributors.includes(agent.agentType) ? " *" : ""}`}
                   status={agent.status}
                   recommendation={agent.recommendation}
                   confidence={agent.confidence}
@@ -527,7 +560,7 @@ export default function HomePage() {
                 />
               ))}
               {(analysisExplanation?.agents.length ?? 0) === 0
-                ? gameAgents.slice(0, 8).map((agent) => (
+                ? gameAgents.map((agent) => (
                     <AgentCard key={agent.id} role={agent.role} status="idle" selected={selectedAgent === agent.id} onSelect={() => setSelectedAgent(agent.id)} />
                   ))
                 : null}
@@ -548,10 +581,73 @@ export default function HomePage() {
           />
         </section>
 
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5" aria-label="More rooms">
+        <section className="grid gap-4 lg:grid-cols-[1fr_0.8fr]" aria-label="Analysis debate and meeting">
+          <PixelCard title="Debate Floor" eyebrow="bull, bear, trader, risk">
+            <div className="grid gap-3 lg:grid-cols-2">
+              <DebateCard title="Bull Researcher" result={bullResearcher} tone="good" onSelect={() => setSelectedAgent("BULL_RESEARCHER")} />
+              <DebateCard title="Bear Researcher" result={bearResearcher} tone="bad" onSelect={() => setSelectedAgent("BEAR_RESEARCHER")} />
+            </div>
+            <div className="mt-3 grid gap-3">
+              <DebateCard title="Trader Plan" result={traderAgent} tone="neutral" onSelect={() => setSelectedAgent("TRADER_AGENT")} />
+              <div>
+                <p className="mb-2 text-[11px] font-black uppercase tracking-[0.08em] text-slate-700">Risk Council</p>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {riskCouncil.map((risk, idx) => (
+                    <DebateCard
+                      key={risk?.agentType ?? idx}
+                      title={risk ? agentLabel(risk.agentType) : ["Aggressive Risk", "Neutral Risk", "Conservative Risk"][idx]}
+                      result={risk}
+                      tone={idx === 0 ? "good" : idx === 2 ? "bad" : "neutral"}
+                      onSelect={() => setSelectedAgent(risk?.agentType ?? ["AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"][idx])}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </PixelCard>
+
+          <PixelCard title="Team Meeting" eyebrow="live room log">
+            <PixelButton tone="magic" onClick={startTeamMeeting} disabled={isMeetingRunning}>
+              {isMeetingRunning ? "Meeting Running" : "Start Meeting"}
+            </PixelButton>
+            <div className="mt-3 max-h-72 overflow-auto rounded-[8px] border border-slate-950/10 bg-slate-950/92 p-2 font-mono text-xs text-emerald-100 shadow-inner">
+              {meetingLog.length === 0 ? (
+                <p>Waiting for the team lead...</p>
+              ) : (
+                meetingLog.map((item, idx) => (
+                  <p key={`${item}-${idx}`} className="border-b border-[#14532d] py-1 last:border-b-0">
+                    {idx + 1}. {item}
+                  </p>
+                ))
+              )}
+            </div>
+          </PixelCard>
+        </section>
+
+        <PixelCard title="Evidence Snapshot" eyebrow={marketContext?.dataQuality.status ?? "loading"}>
+          <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile label="P/E" value={displayNumber(marketContext?.fundamentals.peRatio)} />
+            <StatTile label="Revenue Growth" value={displayPercent(marketContext?.fundamentals.revenueGrowth)} />
+            <StatTile label="EPS Growth" value={displayPercent(marketContext?.fundamentals.epsGrowth)} />
+            <StatTile label="Beta" value={displayNumber(marketContext?.fundamentals.beta)} />
+            <StatTile label="52w High" value={displayMoney(marketContext?.fundamentals.week52High)} />
+            <StatTile label="52w Low" value={displayMoney(marketContext?.fundamentals.week52Low)} />
+            <StatTile label="52w Return" value={displayPercent(marketContext?.fundamentals.week52Return)} />
+            <StatTile label="Analyst Trend" value={marketContext?.analystTrend?.consensus ?? "N/A"} />
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {(marketContext?.news ?? []).slice(0, 4).map((item) => (
+              <p key={`${item.source}-${item.headline}`} className="glass-chip rounded-[8px] px-2 py-2 text-xs leading-5">
+                <span className="font-semibold">{item.sentiment.toUpperCase()}</span> {item.headline}
+              </p>
+            ))}
+            {(marketContext?.news.length ?? 0) === 0 ? <p className="text-xs text-slate-600">No news evidence loaded.</p> : null}
+          </div>
+        </PixelCard>
+
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="More rooms">
           <RoomLink href={selectedTicker ? `/trading?ticker=${encodeURIComponent(selectedTicker)}` : "/trading"} title="Trading Terminal" detail="Live quote gate, account panels, watchlist, open orders, and fills." />
-          <RoomLink href={selectedTicker ? `/research?ticker=${encodeURIComponent(selectedTicker)}` : "/research"} title="Research Room" detail="Agent debate, evidence, caveats, and team-meeting notes." />
-          <RoomLink href="/history" title="History Vault" detail="Watchlist, recommendations, and account-scoped fill history." />
+          <RoomLink href="/history" title="History Vault" detail="AI analysis archive and account-scoped fill history." />
           <RoomLink href={selectedTicker ? `/backtest?ticker=${encodeURIComponent(selectedTicker)}` : "/backtest"} title="Backtest Lab" detail="Replay the manager signal against historical closes." />
           <RoomLink href="/system" title="System Console" detail="API, database, Redis, provider, and runtime readiness." />
         </section>
@@ -654,6 +750,39 @@ function AnalysisOutput({
   );
 }
 
+function DebateCard({
+  title,
+  result,
+  tone,
+  onSelect
+}: {
+  title: string;
+  result?: AnalysisRun["recommendations"][number];
+  tone: "good" | "bad" | "neutral";
+  onSelect: () => void;
+}) {
+  const toneClass = tone === "good" ? "border-emerald-200/80 bg-emerald-100/65" : tone === "bad" ? "border-red-200/80 bg-red-100/65" : "border-white/60 bg-white/56";
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`min-h-40 rounded-[8px] border p-3 text-left shadow-[0_16px_34px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur transition hover:-translate-y-0.5 ${toneClass}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-bold uppercase">{title}</p>
+        <span className={badgeClass(result?.recommendation ?? result?.status ?? "PENDING")}>{result?.recommendation ?? result?.status ?? "PENDING"}</span>
+      </div>
+      <p className="mt-2 min-h-10 text-xs leading-5">{result?.summary ?? "Waiting for this agent to report."}</p>
+      <div className="mt-2 grid gap-1">
+        {(result?.reasons ?? []).slice(0, 2).map((reason, idx) => (
+          <EvidenceReason key={`${result?.id ?? title}-${idx}`} reason={reason} />
+        ))}
+      </div>
+    </button>
+  );
+}
+
 function Metric({ label, value, tone, help }: { label: string; value: string; tone?: "good" | "bad"; help?: string }) {
   const toneClass = tone === "good" ? "text-emerald-800" : tone === "bad" ? "text-red-800" : "text-slate-950";
   return (
@@ -694,6 +823,14 @@ function EvidenceReason({ reason }: { reason: string }) {
       <span>{match ? match[2] : reason}</span>
     </p>
   );
+}
+
+function agentLabel(agent: string) {
+  return agent
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function introForAgent(agentId: string) {
@@ -749,4 +886,16 @@ function formatMoney(value: number) {
 
 function formatSignedPercent(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
+function displayNumber(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "N/A";
+}
+
+function displayPercent(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? formatSignedPercent(value) : "N/A";
+}
+
+function displayMoney(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? formatMoney(value) : "N/A";
 }

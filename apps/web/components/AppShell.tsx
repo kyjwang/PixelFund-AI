@@ -10,7 +10,6 @@ import { PixelButton, cx } from "./GameUI";
 const navItems = [
   { href: "/", label: "Desk" },
   { href: "/trading", label: "Trading" },
-  { href: "/research", label: "Research" },
   { href: "/history", label: "History" },
   { href: "/backtest", label: "Backtest" },
   { href: "/system", label: "System" },
