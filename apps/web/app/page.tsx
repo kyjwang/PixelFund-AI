@@ -476,13 +476,28 @@ export default function HomePage() {
         ) : null}
 
         <section className="grid gap-4 lg:grid-cols-[1.45fr_0.85fr]" aria-label="AI office floor">
-          <PixelOffice
-            onSelect={(agentId) => setSelectedAgent(agentId)}
-            selectedAgent={selectedAgent}
-            agentStatuses={agentStatuses}
-            agentRecommendations={agentRecommendations}
-            agentPerformance={{}}
-          />
+          <div className="grid gap-4">
+            <PixelOffice
+              onSelect={(agentId) => setSelectedAgent(agentId)}
+              selectedAgent={selectedAgent}
+              agentStatuses={agentStatuses}
+              agentRecommendations={agentRecommendations}
+              agentPerformance={{}}
+            />
+
+            <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]" aria-label="Selected agent details">
+              <AgentIntroduction agent={selectedGameAgent} status={terminalStatus} signal={String(terminalSignal)} confidence={terminalConfidence} />
+              <AnalysisOutput
+                ticker={selectedTicker || "NO SYMBOL"}
+                role={selectedGameAgent.role}
+                status={terminalStatus}
+                recommendation={selected?.recommendation ?? selectedExplanation?.recommendation ?? null}
+                confidence={selected?.confidence ?? selectedExplanation?.confidence ?? null}
+                text={agentAnalysisText}
+                reasons={selected?.reasons ?? selectedExplanation?.reasons ?? []}
+              />
+            </section>
+          </div>
 
           <div className="grid gap-4">
             <PixelCard title="Market Tape" eyebrow={selectedTicker || "no symbol"}>
@@ -542,19 +557,6 @@ export default function HomePage() {
                 : null}
             </TeamDecisionPanel>
           </div>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]" aria-label="Selected agent details">
-          <AgentIntroduction agent={selectedGameAgent} status={terminalStatus} signal={String(terminalSignal)} confidence={terminalConfidence} />
-          <AnalysisOutput
-            ticker={selectedTicker || "NO SYMBOL"}
-            role={selectedGameAgent.role}
-            status={terminalStatus}
-            recommendation={selected?.recommendation ?? selectedExplanation?.recommendation ?? null}
-            confidence={selected?.confidence ?? selectedExplanation?.confidence ?? null}
-            text={agentAnalysisText}
-            reasons={selected?.reasons ?? selectedExplanation?.reasons ?? []}
-          />
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[1fr_0.8fr]" aria-label="Analysis debate and meeting">

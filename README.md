@@ -53,6 +53,7 @@ npm run dev
 - [Deployment](docs/DEPLOYMENT.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Incident Runbook](docs/INCIDENT_RUNBOOK.md)
+- [Data Provider Comparison](docs/DATA_PROVIDER_COMPARISON.md)
 - [Changelog](docs/CHANGELOG.md)
 - [Demo Script](docs/showcase/DEMO_SCRIPT.md)
 - [Limitations & Next Steps](docs/showcase/LIMITATIONS_AND_NEXT_STEPS.md)

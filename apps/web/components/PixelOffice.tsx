@@ -317,10 +317,40 @@ const officeWorkflowOrder = [
   "PORTFOLIO_MANAGER"
 ];
 
+const desktopAgentPositions: Record<string, { x: string; y: string }> = {
+  PORTFOLIO_MANAGER: { x: "73%", y: "16%" },
+  TEAM_LEAD: { x: "88%", y: "16%" },
+  TECHNICAL_ANALYST: { x: "9%", y: "34%" },
+  FUNDAMENTALS_ANALYST: { x: "22%", y: "34%" },
+  NEWS_ANALYST: { x: "35%", y: "34%" },
+  MACRO_ANALYST: { x: "48%", y: "34%" },
+  SENTIMENT_ANALYST: { x: "61%", y: "34%" },
+  QUANT_ANALYST: { x: "74%", y: "34%" },
+  CRYPTO_SPECIALIST: { x: "87%", y: "34%" },
+  BULL_RESEARCHER: { x: "39%", y: "54%" },
+  BEAR_RESEARCHER: { x: "54%", y: "54%" },
+  TRADER_AGENT: { x: "22%", y: "75%" },
+  RISK_ANALYST: { x: "43%", y: "75%" },
+  AGGRESSIVE_RISK: { x: "57%", y: "75%" },
+  NEUTRAL_RISK: { x: "71%", y: "75%" },
+  CONSERVATIVE_RISK: { x: "85%", y: "75%" }
+};
+
+const mobileOfficeStages = [
+  { title: "Manager", agentIds: ["PORTFOLIO_MANAGER"] },
+  { title: "Evidence", agentIds: ["TECHNICAL_ANALYST", "FUNDAMENTALS_ANALYST", "NEWS_ANALYST", "MACRO_ANALYST", "SENTIMENT_ANALYST", "QUANT_ANALYST", "CRYPTO_SPECIALIST"] },
+  { title: "Debate", agentIds: ["BULL_RESEARCHER", "BEAR_RESEARCHER"] },
+  { title: "Trader", agentIds: ["TRADER_AGENT"] },
+  { title: "Risk Council", agentIds: ["RISK_ANALYST", "AGGRESSIVE_RISK", "NEUTRAL_RISK", "CONSERVATIVE_RISK"] },
+  { title: "Team Lead", agentIds: ["TEAM_LEAD"] }
+];
+
 export const gameAgents: GameAgent[] = AGENT_PROFILES.map((profile) => {
   const visual = visualAgents.find((agent) => agent.id === profile.id) ?? visualAgents[0];
+  const desktopPosition = desktopAgentPositions[profile.id] ?? { x: visual.x, y: visual.y };
   return {
     ...visual,
+    ...desktopPosition,
     id: profile.id,
     label: profile.label,
     role: profile.role
@@ -347,6 +377,13 @@ function stateClass(state: string, active: boolean) {
   if (state === "bullish") return "border-emerald-300/75 bg-emerald-100/86";
   if (state === "cautious") return "border-amber-300/80 bg-amber-100/86";
   return active ? "border-emerald-300/80 bg-white/88" : "border-white/60 bg-white/55 hover:bg-white/82";
+}
+
+function agentRuntimeState(agent: GameAgent, agentStatuses: Record<string, string | undefined>, agentRecommendations: Record<string, string | undefined>) {
+  const status = agentStatuses[agent.id] ?? "IDLE";
+  const recommendation = agentRecommendations[agent.id];
+  const state = visualState(status, recommendation);
+  return { status, recommendation, state };
 }
 
 function propPixels(agent: GameAgent) {
@@ -397,6 +434,96 @@ function PixelAvatar({ agent, thinking }: { agent: GameAgent; thinking: boolean 
   );
 }
 
+function MobileOfficeBoard({
+  selected,
+  selectedStatus,
+  selectedAgent,
+  onSelect,
+  agentStatuses,
+  agentRecommendations
+}: {
+  selected: GameAgent;
+  selectedStatus: string;
+  selectedAgent: string;
+  onSelect: (agentId: string) => void;
+  agentStatuses: Record<string, string | undefined>;
+  agentRecommendations: Record<string, string | undefined>;
+}) {
+  return (
+    <div className="glass-panel pixel-card w-full rounded-[8px] p-3 md:hidden">
+      <div className="glass-chip rounded-[8px] p-2">
+        <p className="font-pixel text-[10px] text-slate-900">{selected.name}</p>
+        <p className="mt-1 text-[10px] font-black uppercase text-[color:var(--pf-accent)]">{selected.role} / {selectedStatus}</p>
+      </div>
+      <div className="mt-3 grid gap-3">
+        {mobileOfficeStages.map((stage) => (
+          <section key={stage.title} aria-label={`${stage.title} agents`}>
+            <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-slate-600">{stage.title}</p>
+            <div className={`grid gap-2 ${stage.agentIds.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+              {stage.agentIds.map((agentId) => {
+                const agent = gameAgents.find((item) => item.id === agentId) ?? gameAgents[0];
+                const runtime = agentRuntimeState(agent, agentStatuses, agentRecommendations);
+                return (
+                  <MobileAgentTile
+                    key={agent.id}
+                    agent={agent}
+                    active={selectedAgent === agent.id}
+                    status={runtime.status}
+                    recommendation={runtime.recommendation}
+                    state={runtime.state}
+                    onSelect={() => onSelect(agent.id)}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MobileAgentTile({
+  agent,
+  active,
+  status,
+  recommendation,
+  state,
+  onSelect
+}: {
+  agent: GameAgent;
+  active: boolean;
+  status: string;
+  recommendation?: string;
+  state: string;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`min-h-[74px] rounded-[8px] border p-2 text-left shadow-[0_10px_22px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.7)] ${active ? "ring-2 ring-[color:var(--pf-accent)]" : ""} ${stateClass(state, active)}`}
+      title={`${agent.role} (${status})`}
+      aria-label={agent.role}
+    >
+      <div className="flex items-start gap-2">
+        <span className="grid h-9 w-9 shrink-0 place-items-center border-2 border-black font-pixel text-[10px] shadow-[2px_2px_0_#111]" style={{ backgroundColor: agent.accent }}>
+          {agent.label}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[11px] font-black uppercase leading-4 text-slate-950">{agent.role}</span>
+          <span className="mt-0.5 block truncate font-pixel text-[8px] uppercase text-slate-600">{status}</span>
+        </span>
+      </div>
+      {recommendation ? (
+        <span className={`mt-2 inline-flex max-w-full rounded-full border px-1.5 py-0.5 text-[9px] font-black uppercase ${recommendationColor[recommendation] ?? "border-white/60 bg-white/80"}`}>
+          {recommendation}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 export function PixelOffice({
   onSelect,
   selectedAgent,
@@ -415,7 +542,16 @@ export function PixelOffice({
   const selectedPerformance = agentPerformance?.[selected.id];
 
   return (
-    <div className="glass-panel pixel-card relative h-[620px] w-full overflow-hidden rounded-[8px] sm:h-[720px] lg:h-[660px]">
+    <div className="w-full">
+      <MobileOfficeBoard
+        selected={selected}
+        selectedStatus={selectedStatus}
+        selectedAgent={selectedAgent}
+        onSelect={onSelect}
+        agentStatuses={agentStatuses}
+        agentRecommendations={agentRecommendations}
+      />
+    <div className="glass-panel pixel-card relative hidden h-[640px] w-full overflow-hidden rounded-[8px] md:block lg:h-[660px]">
       <div className="absolute inset-x-0 top-0 h-28 bg-sky-200/36" />
       <div className="absolute inset-x-0 top-28 h-24 bg-amber-200/24" />
       <div className="absolute left-0 top-0 h-full w-20 bg-gradient-to-r from-white/32 to-transparent" />
@@ -441,10 +577,10 @@ export function PixelOffice({
       <div className="absolute bottom-44 left-0 right-0 h-5 bg-slate-700/75" />
       <div className="absolute bottom-12 left-[8%] h-10 w-[84%] rounded-[8px] border border-slate-950/10 bg-[#4b372f] shadow-[0_18px_42px_rgba(15,23,42,0.22)]" />
 
-      <div className="glass-chip absolute left-[4%] top-[15%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">evidence desks</div>
-      <div className="glass-chip absolute left-[32%] top-[39%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">bull vs bear</div>
-      <div className="glass-chip absolute left-[9%] top-[59%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">execution + risk</div>
-      <div className="glass-chip absolute right-[4%] bottom-[22%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">leadership</div>
+      <div className="glass-chip absolute left-[4%] top-[22%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">evidence desks</div>
+      <div className="glass-chip absolute left-[32%] top-[45%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">bull vs bear</div>
+      <div className="glass-chip absolute left-[9%] top-[63%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">execution + risk</div>
+      <div className="glass-chip absolute right-[4%] top-[5%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">manager desk</div>
 
       <div className="absolute left-[4%] top-[19%] h-16 w-[90%] rounded-[8px] border border-white/55 bg-white/46 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
       <div className="absolute left-[8%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#dbeafe]" />
@@ -485,8 +621,8 @@ export function PixelOffice({
         <span className="absolute left-3 top-[-10px] h-3 w-6 border-2 border-black bg-white" />
         <span className="absolute left-5 top-2 h-4 w-3 bg-[#6b3f2a]" />
       </div>
-      <div className="absolute inset-x-0 top-3 flex justify-center px-2">
-        <div className="glass-chip max-w-full rounded-full px-3 py-2 text-center">
+      <div className="absolute left-[4%] top-3 z-20 flex max-w-[42%] justify-start px-2">
+        <div className="glass-chip max-w-full rounded-full px-3 py-2 text-left">
           <p className="truncate font-pixel text-[10px] text-slate-900 sm:text-xs">{selected.name}</p>
           <p className="mt-1 truncate text-[9px] font-black uppercase text-[color:var(--pf-accent)]">{selected.role} / {selectedStatus}</p>
         </div>
@@ -494,15 +630,13 @@ export function PixelOffice({
 
       {gameAgents.map((agent) => {
         const active = selectedAgent === agent.id;
-        const agentStatus = agentStatuses[agent.id] ?? "IDLE";
-        const rec = agentRecommendations[agent.id];
-        const state = visualState(agentStatus, rec);
+        const { status: agentStatus, recommendation: rec, state } = agentRuntimeState(agent, agentStatuses, agentRecommendations);
 
         return (
           <button
             key={agent.id}
             onClick={() => onSelect(agent.id)}
-            className={`absolute h-[116px] w-[76px] -translate-x-1/2 -translate-y-1/2 rounded-[8px] border font-pixel text-[7px] leading-none shadow-[0_14px_30px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.66)] backdrop-blur motion-safe:transition-all hover:-translate-y-[53%] hover:brightness-105 motion-safe:active:scale-95 sm:h-[122px] sm:w-[82px] sm:text-[8px] ${active ? "ring-2 ring-[color:var(--pf-accent)]" : ""} ${stateClass(state, active)}`}
+            className={`absolute z-30 h-[112px] w-[74px] -translate-x-1/2 -translate-y-1/2 rounded-[8px] border font-pixel text-[7px] leading-none shadow-[0_14px_30px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.66)] backdrop-blur motion-safe:transition-all hover:z-40 hover:-translate-y-[53%] hover:brightness-105 motion-safe:active:scale-95 lg:h-[116px] lg:w-[76px] ${active ? "z-40 ring-2 ring-[color:var(--pf-accent)]" : ""} ${stateClass(state, active)}`}
             style={{ left: agent.x, top: agent.y }}
             title={`${agent.role} (${agentStatus})`}
             aria-label={agent.role}
@@ -531,6 +665,7 @@ export function PixelOffice({
           </div>
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
