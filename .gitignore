@@ -3,7 +3,8 @@ node_modules
 dist
 coverage
 test-results
-.turbo/cache
+.turbo/
+*.tsbuildinfo
 .env
 .env.*
 !.env.example

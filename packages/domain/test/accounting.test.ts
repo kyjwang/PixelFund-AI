@@ -161,6 +161,78 @@ describe("agent analysis engine", () => {
     expect(output.confidence).toBeGreaterThan(0.6);
   });
 
+  test("fundamentals agent identifies official SEC filing evidence", () => {
+    const context = makeContext({
+      revenueGrowth: 18,
+      netMargin: 20,
+      roe: 24,
+      source: "sec-edgar"
+    });
+    context.sourceAudit = {
+      quote: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      history: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      fundamentals: { provider: "sec-edgar", status: "LIVE", used: true, warnings: [] },
+      filings: { provider: "sec-edgar", status: "LIVE", used: true, warnings: [] },
+      macro: { provider: "fred", status: "DEMO", used: false, warnings: [], missingReason: "FRED unavailable." },
+      news: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      sentiment: { provider: "social-sentiment", status: "DEMO", used: false, warnings: [], missingReason: "Social disabled." },
+      analystTrend: { provider: "finnhub", status: "DEMO", used: false, warnings: [] },
+      crypto: { provider: "coingecko", status: "DEMO", used: false, warnings: [] }
+    };
+
+    const output = buildAgentAnalysis("FUNDAMENTALS_ANALYST", "AAPL", context);
+
+    expect(output.reasons.some((reason) => reason.includes("SEC filing evidence"))).toBe(true);
+  });
+
+  test("macro agent uses FRED series when available", () => {
+    const context = makeContext({ beta: 1.1, revenueGrowth: 8 });
+    context.macroSeries = [{ series: "FEDFUNDS", label: "Federal Funds Rate", value: 5.25, date: "2026-05-01", source: "fred" }];
+    context.sourceAudit = {
+      quote: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      history: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      fundamentals: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      filings: { provider: "sec-edgar", status: "DEMO", used: false, warnings: [] },
+      macro: { provider: "fred", status: "LIVE", used: true, warnings: [] },
+      news: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      sentiment: { provider: "social-sentiment", status: "DEMO", used: false, warnings: [] },
+      analystTrend: { provider: "finnhub", status: "DEMO", used: false, warnings: [] },
+      crypto: { provider: "coingecko", status: "DEMO", used: false, warnings: [] }
+    };
+
+    const output = buildAgentAnalysis("MACRO_ANALYST", "AAPL", context);
+
+    expect(output.reasons.some((reason) => reason.includes("FRED"))).toBe(true);
+  });
+
+  test("sentiment agent labels social sentiment separately from factual evidence", () => {
+    const context = makeContext({});
+    context.socialSentiment = [
+      {
+        headline: "StockTwits: bullish breakout",
+        summary: "bullish breakout",
+        sentiment: "positive",
+        sentimentScore: 0.7,
+        source: "social-sentiment:stocktwits"
+      }
+    ];
+    context.sourceAudit = {
+      quote: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      history: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      fundamentals: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      filings: { provider: "sec-edgar", status: "DEMO", used: false, warnings: [] },
+      macro: { provider: "fred", status: "DEMO", used: false, warnings: [] },
+      news: { provider: "finnhub", status: "LIVE", used: true, warnings: [] },
+      sentiment: { provider: "social-sentiment", status: "LIVE", used: true, warnings: [] },
+      analystTrend: { provider: "finnhub", status: "DEMO", used: false, warnings: [] },
+      crypto: { provider: "coingecko", status: "DEMO", used: false, warnings: [] }
+    };
+
+    const output = buildAgentAnalysis("SENTIMENT_ANALYST", "AAPL", context);
+
+    expect(output.reasons.some((reason) => reason.includes("labeled social sentiment"))).toBe(true);
+  });
+
   test("bull and bear researchers use specialist evidence", () => {
     const context = makeContext({});
     const evidence = [

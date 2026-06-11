@@ -587,6 +587,8 @@ export default function HomePage() {
           <AnalysisTimelinePanel rows={analysisTimelineRows} selectedAgent={selectedAgent} onSelectAgent={setSelectedAgent} />
         </section>
 
+        <DataCoveragePanel sourceAudit={marketContext?.sourceAudit} status={marketContext?.dataQuality.status ?? "loading"} />
+
         <PixelCard title="Evidence Snapshot" eyebrow={marketContext?.dataQuality.status ?? "loading"}>
           <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
             <StatTile label="P/E" value={displayNumber(marketContext?.fundamentals.peRatio)} />
@@ -796,6 +798,53 @@ function DebateCard({
   );
 }
 
+function DataCoveragePanel({
+  sourceAudit,
+  status
+}: {
+  sourceAudit: MarketContext["sourceAudit"];
+  status: string;
+}) {
+  const rows = sourceAudit
+    ? [
+        ["Quote", sourceAudit.quote],
+        ["History", sourceAudit.history],
+        ["Fundamentals", sourceAudit.fundamentals],
+        ["SEC Filings", sourceAudit.filings],
+        ["Macro", sourceAudit.macro],
+        ["News", sourceAudit.news],
+        ["Sentiment", sourceAudit.sentiment],
+        ["Analyst Trend", sourceAudit.analystTrend],
+        ["Crypto", sourceAudit.crypto]
+      ] as const
+    : [];
+
+  return (
+    <PixelCard title="Data Coverage" eyebrow={status}>
+      {rows.length === 0 ? (
+        <EmptyState title="No coverage audit yet" detail="Choose a ticker to load provider coverage, freshness, and missing-data warnings." />
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map(([label, entry]) => (
+            <div key={label} className="glass-chip rounded-[8px] px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-black uppercase text-slate-900">{label}</p>
+                  <p className="mt-1 truncate text-[11px] text-slate-600">{entry.provider}</p>
+                </div>
+                <span className={coverageBadgeClass(entry.status, entry.used)}>{entry.used ? entry.status : "MISSING"}</span>
+              </div>
+              <p className="mt-2 min-h-8 text-[11px] leading-4 text-slate-600">
+                {entry.used ? `Used${entry.asOf ? ` as of ${entry.asOf}` : ""}.` : entry.missingReason ?? "Source unavailable."}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </PixelCard>
+  );
+}
+
 function Metric({ label, value, tone, help }: { label: string; value: string; tone?: "good" | "bad"; help?: string }) {
   const toneClass = tone === "good" ? "text-emerald-800" : tone === "bad" ? "text-red-800" : "text-slate-950";
   return (
@@ -891,6 +940,15 @@ function badgeClass(value: string) {
   if (value === "AVOID") return `${base} border-red-200/80 bg-red-100/80 text-red-950`;
   if (value === "HOLD") return `${base} border-amber-200/80 bg-amber-100/80 text-amber-950`;
   return `${base} border-white/60 bg-white/56 text-slate-700`;
+}
+
+function coverageBadgeClass(status: string, used: boolean) {
+  const base = "shrink-0 rounded-full border px-2 py-1 text-[10px] font-black uppercase";
+  if (!used) return `${base} border-slate-200 bg-white/70 text-slate-600`;
+  if (status === "LIVE") return `${base} border-emerald-200 bg-emerald-100/80 text-emerald-950`;
+  if (status === "PARTIAL" || status === "DELAYED") return `${base} border-amber-200 bg-amber-100/80 text-amber-950`;
+  if (status === "UNSUPPORTED") return `${base} border-red-200 bg-red-100/80 text-red-950`;
+  return `${base} border-slate-200 bg-white/70 text-slate-600`;
 }
 
 function formatMoney(value: number) {

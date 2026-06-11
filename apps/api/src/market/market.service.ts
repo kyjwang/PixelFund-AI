@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { computeTechnicalIndicators } from "@pixelfund/domain";
 import { FinnhubProvider } from "./finnhub.provider";
+import { MarketProviderRegistry, mergeSourceAudits } from "./provider-registry";
 import type { DataQualityStatus, MarketContext, Quote } from "./market.types";
 
 @Injectable()
@@ -8,48 +9,33 @@ export class MarketService {
   private quoteCache = new Map<string, { quote: Quote; cachedAt: number }>();
   private contextCache = new Map<string, { context: MarketContext; cachedAt: number }>();
 
-  constructor(private readonly provider: FinnhubProvider) {}
+  constructor(
+    private readonly registry: MarketProviderRegistry,
+    private readonly quoteProvider: FinnhubProvider
+  ) {}
 
   get capabilities() {
-    return this.provider.capabilities;
+    return this.registry.capabilities[0] ?? this.quoteProvider.capabilities;
   }
 
   providerCapabilities() {
     return {
-      providers: [
-        {
-          name: this.provider.capabilities.name ?? "finnhub",
-          priority: 1,
-          status: process.env.FINNHUB_API_KEY && !process.env.FINNHUB_API_KEY.startsWith("your_") ? "ENABLED" : "DEMO",
-          supportsSearch: true,
-          supportsQuotes: true,
-          supportsFundamentals: true,
-          supportsNews: true,
-          supportsAnalystTrend: true,
-          supportsHistory: true,
-          supportsBatch: this.provider.capabilities.supportsBatch,
-          minPollMs: this.provider.capabilities.minPollMs,
-          notes: [
-            "Primary provider for supported symbols.",
-            "Some non-US exchange resources may be unavailable on the current Finnhub plan.",
-            "Provider registry is ready for a future fallback provider."
-          ]
-        }
-      ]
+      providers: this.registry.capabilities
     };
   }
 
   search(q: string) {
-    return this.provider.search(q);
+    return this.registry.search(q);
   }
 
   async quote(ticker: string) {
     const normalized = ticker.toUpperCase();
-    const quote = await this.provider.getQuote(normalized);
+    const result = await this.registry.quote(normalized);
+    const quote = result.data;
     const cacheTtlMs = Number(process.env.MARKET_CACHE_TTL_MS ?? "900000");
     const cached = this.quoteCache.get(normalized);
 
-    if (quote.source === "finnhub") {
+    if (result.audit.quote.status === "LIVE") {
       this.quoteCache.set(normalized, { quote, cachedAt: Date.now() });
       return quote;
     }
@@ -67,26 +53,27 @@ export class MarketService {
   }
 
   subscribeQuotes(tickers: string[], onQuote: (quote: Quote) => void) {
-    return this.provider.subscribeQuotes(tickers, onQuote);
+    return this.quoteProvider.subscribeQuotes(tickers, onQuote);
   }
 
   news(ticker: string) {
-    return this.provider.news(ticker);
+    return this.registry.news(ticker).then((result) => result.data);
   }
 
   fundamentals(ticker: string) {
-    return this.provider.fundamentals(ticker);
+    return this.registry.fundamentals(ticker).then((result) => result.data);
   }
 
   analystTrend(ticker: string) {
-    return this.provider.analystTrend(ticker);
+    return this.registry.analystTrend(ticker).then((result) => result.data);
   }
 
   async history(ticker: string, range: "1d" | "1mo" | "6mo" | "1y") {
     const normalized = ticker.toUpperCase();
-    const candles = await this.provider.history(normalized, range);
+    const result = await this.registry.history(normalized, range);
+    const candles = result.data;
     const technicals = computeTechnicalIndicators(candles);
-    const source = candles.find((c) => c.source)?.source ?? "demo";
+    const source = candles.find((c) => c.source)?.source ?? result.audit.history.provider;
     const status = statusFromSources([source]);
     return {
       ticker: normalized,
@@ -97,7 +84,8 @@ export class MarketService {
         status,
         provider: source,
         messages: messagesForStatus(status, normalized)
-      }
+      },
+      sourceAudit: result.audit
     };
   }
 
@@ -107,40 +95,68 @@ export class MarketService {
     const cached = this.contextCache.get(normalized);
     if (cached && Date.now() - cached.cachedAt <= cacheTtlMs) return cached.context;
 
-    const [quote, fundamentals, news, analystTrend, history] = await Promise.all([
-      this.quote(normalized),
-      this.fundamentals(normalized),
-      this.news(normalized),
-      this.analystTrend(normalized),
-      this.history(normalized, "1y")
+    const [quoteResult, fundamentalsResult, newsResult, analystTrendResult, history, macroResult, sentimentResult, cryptoResult] = await Promise.all([
+      this.registry.quote(normalized),
+      this.registry.fundamentals(normalized),
+      this.registry.news(normalized),
+      this.registry.analystTrend(normalized),
+      this.history(normalized, "1y"),
+      this.registry.macroSeries(normalized),
+      this.registry.socialSentiment(normalized),
+      this.registry.cryptoContext(normalized)
     ]);
 
-    const liveQuote = quote.source === "finnhub";
-    const hasFundamentals = fundamentals.source === "finnhub";
-    const hasNews = news.some((item) => !item.source.toLowerCase().includes("demo"));
-    const hasAnalystTrend = analystTrend?.source === "finnhub";
+    const quote = quoteResult.data;
+    const fundamentals = fundamentalsResult.data;
+    const news = newsResult.data;
+    const analystTrend = analystTrendResult.data;
+    const sourceAudit = mergeSourceAudits(
+      quoteResult.audit,
+      fundamentalsResult.audit,
+      newsResult.audit,
+      analystTrendResult.audit,
+      history.sourceAudit,
+      macroResult.audit,
+      sentimentResult.audit,
+      cryptoResult.audit
+    );
+    const liveQuote = sourceAudit.quote.status === "LIVE" && sourceAudit.quote.used;
+    const hasFundamentals = sourceAudit.fundamentals.status === "LIVE" && sourceAudit.fundamentals.used;
+    const hasNews = sourceAudit.news.status === "LIVE" && sourceAudit.news.used;
+    const hasAnalystTrend = sourceAudit.analystTrend.status === "LIVE" && sourceAudit.analystTrend.used;
     const hasHistory = history.dataQuality.status === "LIVE";
+    const hasMacro = sourceAudit.macro.status === "LIVE" && sourceAudit.macro.used;
+    const hasSentiment = sourceAudit.sentiment.status === "LIVE" && sourceAudit.sentiment.used;
+    const hasCrypto = sourceAudit.crypto.status === "LIVE" && sourceAudit.crypto.used;
     const status = contextStatus({
-      quoteSource: quote.source,
-      fundamentalsSource: fundamentals.source,
+      quoteSource: sourceAudit.quote.status,
+      fundamentalsSource: sourceAudit.fundamentals.status,
       hasNews,
       hasAnalystTrend,
-      hasHistory
+      hasHistory,
+      hasMacro,
+      hasSentiment,
+      hasCrypto
     });
     const warnings: string[] = [];
 
     if (!liveQuote) warnings.push("Live quote unavailable; demo/fallback quote used.");
-    if (!hasFundamentals) warnings.push("Live fundamentals unavailable; demo/fallback fundamentals used.");
+    if (!hasFundamentals) warnings.push("Official or live fundamentals unavailable; demo/fallback fundamentals used.");
     if (!hasNews) warnings.push("Live news unavailable; demo/fallback headlines used.");
     if (!hasAnalystTrend) warnings.push("Live analyst trend unavailable.");
     if (!hasHistory) warnings.push("Live historical candles unavailable; demo/fallback history used.");
+    if (!hasMacro) warnings.push("Structured macro data unavailable; macro agent will use ticker context only.");
+    if (!hasSentiment) warnings.push("Social sentiment unavailable; sentiment remains news-derived only.");
 
     const score =
       (liveQuote ? 0.35 : 0.12) +
       (hasFundamentals ? 0.3 : 0.1) +
       (hasNews ? 0.2 : 0.08) +
       (hasAnalystTrend ? 0.1 : 0.03) +
-      (hasHistory ? 0.05 : 0.01);
+      (hasHistory ? 0.05 : 0.01) +
+      (hasMacro ? 0.04 : 0) +
+      (hasSentiment ? 0.02 : 0) +
+      (hasCrypto ? 0.02 : 0);
 
     const context = {
       ticker: normalized,
@@ -149,11 +165,19 @@ export class MarketService {
       technicals: history.technicals,
       news,
       analystTrend,
+      macroSeries: macroResult.data,
+      socialSentiment: sentimentResult.data,
+      cryptoContext: cryptoResult.data,
+      sourceAudit,
       generatedAt: new Date().toISOString(),
       dataQuality: {
         score: Math.min(1, Number(score.toFixed(2))),
         status,
-        provider: providerLabel([quote.source, fundamentals.source, history.dataQuality.provider]),
+        provider: providerLabel(
+          Object.values(sourceAudit)
+            .filter((entry) => entry.used)
+            .map((entry) => entry.provider)
+        ),
         liveQuote,
         fundamentals: hasFundamentals,
         news: hasNews,
@@ -170,7 +194,7 @@ export class MarketService {
 function statusFromSources(sources: string[]): DataQualityStatus {
   const normalized = sources.map((s) => s.toLowerCase());
   if (normalized.some((s) => s.includes("unsupported"))) return "UNSUPPORTED";
-  const live = normalized.filter((s) => s === "finnhub").length;
+  const live = normalized.filter((s) => !s.includes("demo") && !s.includes("fallback") && !s.includes("cache") && s !== "not-requested").length;
   if (live === sources.length) return "LIVE";
   if (live > 0) return "PARTIAL";
   if (normalized.some((s) => s.includes("demo"))) return "DEMO";
@@ -183,21 +207,24 @@ function contextStatus(input: {
   hasNews: boolean;
   hasAnalystTrend: boolean;
   hasHistory: boolean;
+  hasMacro: boolean;
+  hasSentiment: boolean;
+  hasCrypto: boolean;
 }): DataQualityStatus {
   const quoteSource = input.quoteSource.toLowerCase();
   const fundamentalsSource = input.fundamentalsSource.toLowerCase();
   const coreUnsupported = quoteSource.includes("unsupported") || fundamentalsSource.includes("unsupported");
   if (coreUnsupported) return "UNSUPPORTED";
 
-  const coreLive = quoteSource === "finnhub" && fundamentalsSource === "finnhub";
-  const allLive = coreLive && input.hasNews && input.hasAnalystTrend && input.hasHistory;
+  const coreLive = quoteSource === "live" && fundamentalsSource === "live";
+  const allLive = coreLive && input.hasNews && input.hasAnalystTrend && input.hasHistory && input.hasMacro;
   if (allLive) return "LIVE";
-  if (coreLive || input.hasNews || input.hasAnalystTrend || input.hasHistory) return "PARTIAL";
+  if (coreLive || input.hasNews || input.hasAnalystTrend || input.hasHistory || input.hasMacro || input.hasSentiment || input.hasCrypto) return "PARTIAL";
   return "DEMO";
 }
 
 function providerLabel(sources: string[]) {
-  return Array.from(new Set(sources)).join("+");
+  return Array.from(new Set(sources.filter(Boolean))).join("+") || "demo";
 }
 
 function messagesForStatus(status: DataQualityStatus, ticker: string) {

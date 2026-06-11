@@ -97,6 +97,45 @@ export const analystTrendSchema = z.object({
   source: z.string()
 });
 
+export const sourceAuditEntrySchema = z.object({
+  provider: z.string(),
+  status: dataQualityStatusSchema,
+  used: z.boolean(),
+  asOf: z.string().optional(),
+  warnings: z.array(z.string()),
+  missingReason: z.string().optional()
+});
+
+export const sourceAuditSchema = z.object({
+  quote: sourceAuditEntrySchema,
+  history: sourceAuditEntrySchema,
+  fundamentals: sourceAuditEntrySchema,
+  filings: sourceAuditEntrySchema,
+  macro: sourceAuditEntrySchema,
+  news: sourceAuditEntrySchema,
+  sentiment: sourceAuditEntrySchema,
+  analystTrend: sourceAuditEntrySchema,
+  crypto: sourceAuditEntrySchema
+});
+
+export const macroSeriesPointSchema = z.object({
+  series: z.string(),
+  label: z.string(),
+  value: z.number(),
+  date: z.string(),
+  source: z.string()
+});
+
+export const cryptoContextSchema = z.object({
+  asset: z.string(),
+  priceUsd: z.number().nonnegative(),
+  change24hPercent: z.number(),
+  marketCapUsd: z.number().nonnegative().optional(),
+  volume24hUsd: z.number().nonnegative().optional(),
+  source: z.string(),
+  updatedAt: z.string()
+});
+
 export const marketContextSchema = z.object({
   ticker: tickerSchema,
   quote: quoteSchema,
@@ -105,6 +144,10 @@ export const marketContextSchema = z.object({
   news: z.array(newsItemSchema),
   analystTrend: analystTrendSchema.nullable(),
   generatedAt: z.string(),
+  sourceAudit: sourceAuditSchema.optional(),
+  macroSeries: z.array(macroSeriesPointSchema).optional(),
+  cryptoContext: cryptoContextSchema.nullable().optional(),
+  socialSentiment: z.array(newsItemSchema).optional(),
   dataQuality: z.object({
     score: z.number().min(0).max(1),
     status: dataQualityStatusSchema,

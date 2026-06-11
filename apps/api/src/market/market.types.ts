@@ -73,6 +73,46 @@ export type TechnicalIndicators = {
 
 export type DataQualityStatus = "LIVE" | "PARTIAL" | "DELAYED" | "UNSUPPORTED" | "DEMO";
 
+export type SourceAuditCategory =
+  | "quote"
+  | "history"
+  | "fundamentals"
+  | "filings"
+  | "macro"
+  | "news"
+  | "sentiment"
+  | "analystTrend"
+  | "crypto";
+
+export type SourceAuditEntry = {
+  provider: string;
+  status: DataQualityStatus;
+  used: boolean;
+  asOf?: string;
+  warnings: string[];
+  missingReason?: string;
+};
+
+export type SourceAudit = Record<SourceAuditCategory, SourceAuditEntry>;
+
+export type MacroSeriesPoint = {
+  series: string;
+  label: string;
+  value: number;
+  date: string;
+  source: string;
+};
+
+export type CryptoContext = {
+  asset: string;
+  priceUsd: number;
+  change24hPercent: number;
+  marketCapUsd?: number;
+  volume24hUsd?: number;
+  source: string;
+  updatedAt: string;
+};
+
 export type MarketContext = {
   ticker: string;
   quote: Quote;
@@ -81,6 +121,10 @@ export type MarketContext = {
   news: NewsItem[];
   analystTrend: AnalystTrend | null;
   generatedAt: string;
+  macroSeries?: MacroSeriesPoint[];
+  cryptoContext?: CryptoContext | null;
+  socialSentiment?: NewsItem[];
+  sourceAudit?: SourceAudit;
   dataQuality: {
     score: number;
     status: DataQualityStatus;
@@ -104,15 +148,22 @@ export type ProviderCapabilities = {
   supportsNews?: boolean;
   supportsAnalystTrend?: boolean;
   supportsHistory?: boolean;
+  supportsFilings?: boolean;
+  supportsMacro?: boolean;
+  supportsSocialSentiment?: boolean;
+  supportsCrypto?: boolean;
 };
 
 export interface MarketDataProvider {
   capabilities: ProviderCapabilities;
-  search(symbol: string): Promise<Array<{ symbol: string; description: string }>>;
-  getQuote(ticker: string): Promise<Quote>;
-  subscribeQuotes(tickers: string[], onQuote: (quote: Quote) => void): () => void;
-  news(ticker: string): Promise<NewsItem[]>;
-  fundamentals(ticker: string): Promise<Fundamentals>;
-  analystTrend(ticker: string): Promise<AnalystTrend | null>;
-  history(ticker: string, range: "1d" | "1mo" | "6mo" | "1y"): Promise<HistoricalCandle[]>;
+  search?(symbol: string): Promise<Array<{ symbol: string; description: string }>>;
+  getQuote?(ticker: string): Promise<Quote | null>;
+  subscribeQuotes?(tickers: string[], onQuote: (quote: Quote) => void): () => void;
+  news?(ticker: string): Promise<NewsItem[] | null>;
+  fundamentals?(ticker: string): Promise<Fundamentals | null>;
+  analystTrend?(ticker: string): Promise<AnalystTrend | null>;
+  history?(ticker: string, range: "1d" | "1mo" | "6mo" | "1y"): Promise<HistoricalCandle[] | null>;
+  macroSeries?(ticker: string): Promise<MacroSeriesPoint[] | null>;
+  socialSentiment?(ticker: string): Promise<NewsItem[] | null>;
+  cryptoContext?(ticker: string): Promise<CryptoContext | null>;
 }

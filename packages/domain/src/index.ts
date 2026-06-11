@@ -600,6 +600,12 @@ function fundamentalsAnalysis(ticker: string, context: MarketContext): AgentAnal
   let score = 50;
   let evidence = 0;
 
+  if (context.sourceAudit?.filings.used && context.sourceAudit.filings.provider === "sec-edgar") {
+    score += 4;
+    evidence += 1;
+    reasons.push("[sec-edgar] Official SEC filing evidence is available for the fundamentals read.");
+  }
+
   if (isFiniteNumber(f.peRatio)) {
     if (f.peRatio > 0 && f.peRatio <= 18) score += 9;
     else if (f.peRatio <= 32) score += 4;
@@ -708,6 +714,21 @@ function macroAnalysis(ticker: string, context: MarketContext): AgentAnalysisOut
   let score = 50;
   let evidence = 0;
 
+  if (context.sourceAudit?.macro.used && (context.macroSeries?.length ?? 0) > 0) {
+    const rates = context.macroSeries?.find((series) => series.series === "FEDFUNDS");
+    if (rates) {
+      if (rates.value >= 5) score -= 4;
+      else if (rates.value <= 2) score += 3;
+      evidence += 1;
+      reasons.push(`[FRED] ${rates.label} is ${round(rates.value, 2)} as of ${rates.date}.`);
+    } else {
+      evidence += 0.5;
+      reasons.push(`[FRED] ${context.macroSeries?.length ?? 0} structured macro series are available.`);
+    }
+  } else if (context.sourceAudit?.macro.missingReason) {
+    reasons.push(`[macro] ${context.sourceAudit.macro.missingReason}`);
+  }
+
   if (isFiniteNumber(f.beta)) {
     if (f.beta > 1.4) score -= 7;
     else if (f.beta < 0.9) score += 4;
@@ -742,6 +763,14 @@ function sentimentAnalysis(ticker: string, context: MarketContext): AgentAnalysi
   const reasons: string[] = [];
   let score = 50;
   let evidence = 0;
+
+  const socialScores = (context.socialSentiment ?? []).map((item) => item.sentimentScore ?? sentimentToScore(item.sentiment));
+  if (context.sourceAudit?.sentiment.used && socialScores.length > 0) {
+    const averageSocial = socialScores.reduce((sum, value) => sum + value, 0) / socialScores.length;
+    score += averageSocial * 10;
+    evidence += Math.min(socialScores.length, 5) / 3;
+    reasons.push(`[social] ${socialScores.length} labeled social sentiment item${socialScores.length === 1 ? "" : "s"} are ${sentimentLabel(averageSocial)}; treated as crowd mood, not factual evidence.`);
+  }
 
   const sentimentScores = context.news.map((item) => item.sentimentScore ?? sentimentToScore(item.sentiment));
   if (sentimentScores.length > 0) {
@@ -811,7 +840,12 @@ function cryptoSpecialistAnalysis(ticker: string, context: MarketContext): Agent
 
   const symbol = ticker.toUpperCase();
   const cryptoAdjacent = ["COIN", "MSTR", "MARA", "RIOT", "HOOD", "SQ", "PYPL", "TSLA"].includes(symbol);
-  if (cryptoAdjacent) {
+  if (context.sourceAudit?.crypto.used && context.cryptoContext) {
+    const cryptoMove = clamp(context.cryptoContext.change24hPercent, -12, 12);
+    score += cryptoMove > 0 ? Math.min(cryptoMove / 2, 5) : Math.max(cryptoMove / 2, -7);
+    evidence += 1;
+    reasons.push(`[coingecko] ${context.cryptoContext.asset} moved ${formatPercent(context.cryptoContext.change24hPercent)} over 24h.`);
+  } else if (cryptoAdjacent) {
     score += context.quote.changePercent >= 0 ? 5 : -7;
     evidence += 1;
     reasons.push(`[liquidity] ${symbol} is crypto-adjacent, so risk-asset liquidity can amplify moves.`);
