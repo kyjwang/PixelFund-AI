@@ -5,6 +5,8 @@ export const recommendationSchema = z.enum(["BUY", "HOLD", "AVOID"]);
 export const agentStatusSchema = z.enum(["PENDING", "RUNNING", "COMPLETED", "FAILED"]);
 export const dataQualityStatusSchema = z.enum(["LIVE", "PARTIAL", "DELAYED", "UNSUPPORTED", "DEMO"]);
 export const orderStatusSchema = z.enum(["PENDING", "FILLED", "PARTIALLY_FILLED", "CANCELED", "REJECTED", "EXPIRED"]);
+export const cryptoSymbolSchema = z.enum(["BTC", "ETH", "SOL"]);
+export const cryptoTraderActionSchema = z.enum(["BUY", "SELL", "HOLD"]);
 export const agentTypeSchema = z.enum([
   "TECHNICAL_ANALYST",
   "NEWS_ANALYST",
@@ -136,6 +138,15 @@ export const cryptoContextSchema = z.object({
   updatedAt: z.string()
 });
 
+export const cryptoCandleSchema = z.object({
+  timestamp: z.string(),
+  open: z.number().nonnegative(),
+  high: z.number().nonnegative(),
+  low: z.number().nonnegative(),
+  close: z.number().nonnegative(),
+  volume: z.number().nonnegative()
+});
+
 export const marketContextSchema = z.object({
   ticker: tickerSchema,
   quote: quoteSchema,
@@ -219,7 +230,7 @@ export const stockHistorySchema = z.object({
 export const tradeCreateSchema = z.object({
   ticker: tickerSchema,
   side: z.enum(["BUY", "SELL"]),
-  quantity: z.number().int().positive(),
+  quantity: z.number().positive(),
   orderType: z.enum(["MARKET", "LIMIT", "STOP"]).default("MARKET"),
   limitPrice: z.number().positive().optional(),
   stopPrice: z.number().positive().optional()
@@ -234,13 +245,13 @@ export const tradePreviewSchema = z.object({
   estimatedPrice: z.number().nonnegative(),
   estimatedGross: z.number().nonnegative(),
   projectedCash: z.number(),
-  projectedShares: z.number().int().nonnegative(),
+  projectedShares: z.number().nonnegative(),
   executableNow: z.boolean(),
   sizingHint: z.object({
-    maxAffordableShares: z.number().int().nonnegative(),
+    maxAffordableShares: z.number().nonnegative(),
     currentExposurePercent: z.number().nonnegative(),
     projectedExposurePercent: z.number().nonnegative(),
-    suggestedMaxShares: z.number().int().nonnegative(),
+    suggestedMaxShares: z.number().nonnegative(),
     message: z.string()
   }),
   warnings: z.array(z.string())
@@ -294,7 +305,7 @@ export const watchlistItemSchema = z.object({
 
 export const portfolioPositionSchema = z.object({
   ticker: tickerSchema,
-  quantity: z.number().int().nonnegative(),
+  quantity: z.number().nonnegative(),
   averageCost: z.number().nonnegative(),
   marketPrice: z.number().nonnegative(),
   marketValue: z.number().nonnegative(),
@@ -320,7 +331,7 @@ export const tradeSchema = z.object({
   orderId: z.string().nullable().optional(),
   ticker: tickerSchema,
   side: z.enum(["BUY", "SELL"]),
-  quantity: z.number().int().positive(),
+  quantity: z.number().positive(),
   price: z.number().nonnegative(),
   orderType: z.enum(["MARKET", "LIMIT", "STOP"]).optional(),
   requestedPrice: z.number().nullable().optional(),
@@ -331,8 +342,8 @@ export const orderSchema = z.object({
   id: z.string(),
   ticker: tickerSchema,
   side: z.enum(["BUY", "SELL"]),
-  quantity: z.number().int().positive(),
-  filledQuantity: z.number().int().nonnegative(),
+  quantity: z.number().positive(),
+  filledQuantity: z.number().nonnegative(),
   status: orderStatusSchema,
   orderType: z.enum(["MARKET", "LIMIT", "STOP"]),
   limitPrice: z.number().nullable().optional(),
@@ -402,6 +413,55 @@ export const analysisExplanationSchema = z.object({
   topContributors: z.array(agentTypeSchema),
   caveats: z.array(z.string()),
   agents: z.array(agentExplanationItemSchema)
+});
+
+export const cryptoTraderSettingsSchema = z.object({
+  id: z.string(),
+  ownerKey: z.string(),
+  enabled: z.boolean(),
+  selectedCoins: z.array(cryptoSymbolSchema).min(1).max(2),
+  maxTradesPerDay: z.number().int().min(1).max(10),
+  stopLossPercent: z.number().min(1).max(25),
+  maxPortfolioPercent: z.number().min(1).max(20),
+  lastCheckedAt: z.coerce.string().nullable().optional(),
+  createdAt: z.coerce.string(),
+  updatedAt: z.coerce.string()
+});
+
+export const cryptoTraderSettingsUpdateSchema = z.object({
+  enabled: z.boolean().optional(),
+  selectedCoins: z.array(cryptoSymbolSchema).min(1).max(2).optional(),
+  maxTradesPerDay: z.number().int().min(1).max(10).optional(),
+  stopLossPercent: z.number().min(1).max(25).optional(),
+  maxPortfolioPercent: z.number().min(1).max(20).optional()
+});
+
+export const cryptoTraderLogSchema = z.object({
+  id: z.string(),
+  ownerKey: z.string(),
+  swedenDay: z.string(),
+  ticker: cryptoSymbolSchema,
+  coinId: z.string(),
+  action: cryptoTraderActionSchema,
+  score: z.number(),
+  reason: z.string(),
+  reasons: z.array(z.string()),
+  price: z.number().nullable().optional(),
+  quantity: z.number().nullable().optional(),
+  notional: z.number().nullable().optional(),
+  tradeId: z.string().nullable().optional(),
+  createdAt: z.coerce.string()
+});
+
+export const cryptoTraderCheckResultSchema = z.object({
+  checkedAt: z.string(),
+  tradesToday: z.number().int().nonnegative(),
+  settings: cryptoTraderSettingsSchema,
+  logs: z.array(cryptoTraderLogSchema)
+});
+
+export const cryptoCashAdjustmentSchema = z.object({
+  amount: z.union([z.literal(10000), z.literal(-10000)])
 });
 
 export const analysisRunSchema = z.object({
@@ -481,6 +541,10 @@ export type Order = z.infer<typeof orderSchema>;
 export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
 export type OrderPreview = z.infer<typeof orderPreviewSchema>;
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
+export type CryptoSymbol = z.infer<typeof cryptoSymbolSchema>;
+export type CryptoTraderSettings = z.infer<typeof cryptoTraderSettingsSchema>;
+export type CryptoTraderSettingsUpdate = z.infer<typeof cryptoTraderSettingsUpdateSchema>;
+export type CryptoTraderLog = z.infer<typeof cryptoTraderLogSchema>;
 export type AnalysisRun = z.infer<typeof analysisRunSchema>;
 export type AgentResult = z.infer<typeof agentResultSchema>;
 export type AnalysisExplanation = z.infer<typeof analysisExplanationSchema>;

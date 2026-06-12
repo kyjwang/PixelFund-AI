@@ -1,4 +1,4 @@
-import { describe, beforeAll, afterAll, beforeEach, expect, test } from "@jest/globals";
+import { describe, beforeAll, afterAll, beforeEach, expect, jest, test } from "@jest/globals";
 import request from "supertest";
 import { INestApplication } from "@nestjs/common";
 import { createIntegrationApp, resetDb, waitFor } from "./test-app";
@@ -15,8 +15,12 @@ import {
   orderPreviewSchema,
   stockHistorySchema,
   tradeSchema,
+  cryptoTraderCheckResultSchema,
+  cryptoTraderLogSchema,
+  cryptoTraderSettingsSchema,
   watchlistItemSchema
 } from "@pixelfund/schemas";
+import { CoinGeckoProvider } from "../../src/market/coingecko.provider";
 
 describe("http integration", () => {
   let app: INestApplication;
@@ -307,6 +311,99 @@ describe("http integration", () => {
     expect(orderSchema.parse(canceled.body.data).status).toBe("CANCELED");
 
     await request(server).post(`/orders/${orderA.id}/cancel`).set("x-demo-user-id", "orders-b").expect(404);
+  });
+
+  test("crypto trader settings, cash adjustment, and logs are account scoped", async () => {
+    const accountA = "crypto-settings-a";
+    const accountB = "crypto-settings-b";
+
+    const settings = await request(server)
+      .put("/crypto-trader/settings")
+      .set("x-demo-user-id", accountA)
+      .send({ enabled: true, selectedCoins: ["BTC", "ETH"], maxTradesPerDay: 6, stopLossPercent: 5, maxPortfolioPercent: 18 })
+      .expect(200);
+    const parsedSettings = cryptoTraderSettingsSchema.parse(settings.body.data);
+    expect(parsedSettings.selectedCoins).toEqual(["BTC", "ETH"]);
+    expect(parsedSettings.enabled).toBe(true);
+
+    const cashAdded = await request(server)
+      .post("/crypto-trader/cash-adjustment")
+      .set("x-demo-user-id", accountA)
+      .send({ amount: 10000 })
+      .expect(201);
+    expect(portfolioSchema.parse(cashAdded.body.data).cash).toBe(110000);
+
+    await prisma.demoAccount.create({ data: { ownerKey: accountB, cash: 5000 } });
+    await request(server)
+      .post("/crypto-trader/cash-adjustment")
+      .set("x-demo-user-id", accountB)
+      .send({ amount: -10000 })
+      .expect(400);
+
+    await prisma.cryptoTraderLog.create({
+      data: {
+        ownerKey: accountA,
+        swedenDay: "2026-06-12",
+        ticker: "BTC",
+        coinId: "bitcoin",
+        action: "HOLD",
+        score: 12,
+        reason: "HOLD because signal was weak.",
+        reasons: ["Momentum was not strong enough."]
+      }
+    });
+
+    const logsA = await request(server).get("/crypto-trader/logs").set("x-demo-user-id", accountA).expect(200);
+    const logsB = await request(server).get("/crypto-trader/logs").set("x-demo-user-id", accountB).expect(200);
+    expect(cryptoTraderLogSchema.array().parse(logsA.body.data).map((log) => log.ticker)).toEqual(["BTC"]);
+    expect(logsB.body.data).toEqual([]);
+  });
+
+  test("crypto trader check saves BUY and HOLD decisions with mocked CoinGecko data", async () => {
+    const risingCandles = Array.from({ length: 24 }, (_, index) => {
+      const price = 100 + index * 2;
+      return {
+        ticker: "BTC",
+        date: new Date(Date.UTC(2026, 5, 12, index)).toISOString(),
+        open: price - 1,
+        high: price + 2,
+        low: price - 2,
+        close: price,
+        volume: 0,
+        source: "coingecko"
+      };
+    });
+    const historySpy = jest.spyOn(CoinGeckoProvider.prototype, "cryptoHistory").mockResolvedValue(risingCandles);
+    const contextSpy = jest.spyOn(CoinGeckoProvider.prototype, "cryptoContext").mockImplementation(async (ticker: string) => ({
+      asset: ticker.toUpperCase() === "ETH" ? "ethereum" : "bitcoin",
+      priceUsd: 150,
+      change24hPercent: 2,
+      source: "coingecko",
+      updatedAt: "2026-06-12T12:00:00.000Z"
+    }));
+
+    try {
+      const owner = "crypto-check-a";
+      await request(server)
+        .put("/crypto-trader/settings")
+        .set("x-demo-user-id", owner)
+        .send({ enabled: true, selectedCoins: ["BTC", "ETH"], maxTradesPerDay: 1, stopLossPercent: 4, maxPortfolioPercent: 20 })
+        .expect(200);
+
+      const checked = await request(server).post("/crypto-trader/check-now").set("x-demo-user-id", owner).expect(201);
+      const parsed = cryptoTraderCheckResultSchema.parse(checked.body.data);
+
+      expect(parsed.logs).toHaveLength(2);
+      expect(parsed.logs.map((log) => log.action)).toEqual(["BUY", "HOLD"]);
+      expect(parsed.logs[0].tradeId).toBeTruthy();
+      expect(parsed.logs[1].reason).toContain("Daily trade limit");
+
+      const portfolio = portfolioSchema.parse((await request(server).get("/portfolio").set("x-demo-user-id", owner).expect(200)).body.data);
+      expect(portfolio.positions.find((position) => position.ticker === "BTC")?.quantity).toBeGreaterThan(0);
+    } finally {
+      historySpy.mockRestore();
+      contextSpy.mockRestore();
+    }
   });
 
   test("isolates watchlists by demo account header", async () => {

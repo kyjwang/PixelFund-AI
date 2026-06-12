@@ -32,6 +32,6 @@ import { MarketProviderRegistry } from "./provider-registry";
       inject: [FinnhubProvider, AlphaVantageProvider, SecEdgarProvider, FredProvider, CoinGeckoProvider, SocialSentimentProvider]
     }
   ],
-  exports: [MarketService]
+  exports: [MarketService, CoinGeckoProvider]
 })
 export class MarketModule {}

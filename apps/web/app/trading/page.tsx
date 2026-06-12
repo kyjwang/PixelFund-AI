@@ -8,6 +8,11 @@ import { z } from "zod";
 import {
   analysisExplanationSchema,
   analysisRunSchema,
+  cryptoCashAdjustmentSchema,
+  cryptoTraderCheckResultSchema,
+  cryptoTraderLogSchema,
+  cryptoTraderSettingsSchema,
+  cryptoTraderSettingsUpdateSchema,
   marketContextSchema,
   orderPreviewSchema,
   orderSchema,
@@ -32,9 +37,13 @@ type Order = z.infer<typeof orderSchema>;
 type OrderPreview = z.infer<typeof orderPreviewSchema>;
 type StockHistory = z.infer<typeof stockHistorySchema>;
 type WatchlistItem = z.infer<typeof watchlistItemSchema>;
+type CryptoTraderSettings = z.infer<typeof cryptoTraderSettingsSchema>;
+type CryptoTraderSettingsUpdate = z.infer<typeof cryptoTraderSettingsUpdateSchema>;
+type CryptoTraderLog = z.infer<typeof cryptoTraderLogSchema>;
 
 type Tab = "positions" | "orders" | "fills" | "analysis";
 type Range = "1d" | "1mo" | "6mo" | "1y";
+type TradingMode = "stock" | "crypto";
 
 const softInputClass = "h-12 rounded-[8px] border border-white/70 bg-white/70 px-3 font-pixel text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_12px_28px_rgba(15,23,42,0.08)] outline-none backdrop-blur focus:bg-white/95";
 const compactInputClass = "h-11 rounded-[8px] border border-white/70 bg-white/70 px-2 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_10px_24px_rgba(15,23,42,0.07)] outline-none backdrop-blur focus:bg-white/95";
@@ -50,6 +59,8 @@ export default function TradingPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [cryptoSettings, setCryptoSettings] = useState<CryptoTraderSettings | null>(null);
+  const [cryptoLogs, setCryptoLogs] = useState<CryptoTraderLog[]>([]);
   const [searchResults, setSearchResults] = useState<Array<{ symbol: string; description: string }>>([]);
   const [quantity, setQuantity] = useState(1);
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
@@ -60,8 +71,11 @@ export default function TradingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [range, setRange] = useState<Range>("1mo");
   const [activeTab, setActiveTab] = useState<Tab>("positions");
+  const [tradingMode, setTradingMode] = useState<TradingMode>("stock");
   const [socketConnected, setSocketConnected] = useState(false);
   const [quoteStale, setQuoteStale] = useState(false);
+  const [isCryptoChecking, setIsCryptoChecking] = useState(false);
+  const [isCashAdjusting, setIsCashAdjusting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const tickerRef = useRef(ticker);
@@ -73,12 +87,14 @@ export default function TradingPage() {
   async function refresh(targetTicker = normalizedTicker, targetRange = range) {
     const normalized = targetTicker.trim().toUpperCase();
     try {
-      const [p, r, o, t, w] = await Promise.all([
+      const [p, r, o, t, w, cs, cl] = await Promise.all([
         api("/portfolio", portfolioSchema),
         api("/analysis-runs", z.array(analysisRunSchema)),
         api("/orders?limit=50", z.array(orderSchema)),
         api("/trades?limit=50", z.array(tradeSchema)),
-        api("/watchlist", z.array(watchlistItemSchema))
+        api("/watchlist", z.array(watchlistItemSchema)),
+        api("/crypto-trader/settings", cryptoTraderSettingsSchema),
+        api("/crypto-trader/logs?limit=50", z.array(cryptoTraderLogSchema))
       ]);
       const [c, h] = normalized
         ? await Promise.all([
@@ -93,6 +109,8 @@ export default function TradingPage() {
       setOrders(o);
       setTrades(t);
       setWatchlist(w);
+      setCryptoSettings(cs);
+      setCryptoLogs(cl);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to load trading terminal data");
@@ -315,11 +333,85 @@ export default function TradingPage() {
     await refresh(normalizedTicker, range);
   }
 
+  async function updateCryptoSettings(patch: CryptoTraderSettingsUpdate) {
+    try {
+      const updated = await api("/crypto-trader/settings", cryptoTraderSettingsSchema, {
+        method: "PUT",
+        body: JSON.stringify(patch)
+      });
+      setCryptoSettings(updated);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to update crypto bot settings");
+    }
+  }
+
+  async function runCryptoCheck() {
+    setIsCryptoChecking(true);
+    try {
+      const result = await api("/crypto-trader/check-now", cryptoTraderCheckResultSchema, { method: "POST" });
+      setCryptoSettings(result.settings);
+      setCryptoLogs((logs) => [...result.logs, ...logs].slice(0, 50));
+      await refresh(normalizedTicker, range);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Crypto bot check failed");
+    } finally {
+      setIsCryptoChecking(false);
+    }
+  }
+
+  async function adjustCryptoCash(amount: z.infer<typeof cryptoCashAdjustmentSchema>["amount"]) {
+    setIsCashAdjusting(true);
+    try {
+      const nextPortfolio = await api("/crypto-trader/cash-adjustment", portfolioSchema, {
+        method: "POST",
+        body: JSON.stringify({ amount })
+      });
+      setPortfolio(nextPortfolio);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to adjust virtual cash");
+    } finally {
+      setIsCashAdjusting(false);
+    }
+  }
+
   const blockingWarning = (orderPreview?.warnings ?? []).some((warning) => warning.toLowerCase().includes("insufficient"));
   const canSubmit = Boolean(orderPreview && terminalTradable && !blockingWarning && !isSubmitting);
 
   return (
     <main className="mx-auto grid max-w-[1500px] gap-3 px-3 py-3 text-slate-950 sm:px-4 md:px-6">
+      <div className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-[8px] p-2">
+        <div>
+          <p className="font-pixel text-[10px] uppercase tracking-[0.16em] text-emerald-700">Trading mode</p>
+          <p className="text-xs text-slate-600">Stocks stay manual. Crypto mode can run the fake-money bot.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {(["stock", "crypto"] as TradingMode[]).map((mode) => (
+            <button
+              key={mode}
+              className={cx("min-h-10 rounded-full border px-4 text-xs font-black uppercase transition hover:-translate-y-0.5", tradingMode === mode ? "border-slate-950/20 bg-slate-950 text-white" : "border-white/60 bg-white/64 text-slate-700 hover:bg-white/84")}
+              onClick={() => setTradingMode(mode)}
+            >
+              {mode === "stock" ? "Stock" : "Crypto"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tradingMode === "crypto" ? (
+        <CryptoModePanel
+          portfolio={portfolio}
+          settings={cryptoSettings}
+          logs={cryptoLogs}
+          isChecking={isCryptoChecking}
+          isCashAdjusting={isCashAdjusting}
+          onUpdateSettings={(patch) => void updateCryptoSettings(patch)}
+          onCheckNow={() => void runCryptoCheck()}
+          onAdjustCash={(amount) => void adjustCryptoCash(amount)}
+        />
+      ) : (
       <section className="grid gap-3 xl:grid-cols-[320px_1fr_360px]">
         <div className="grid gap-3">
           <PixelCard title="Markets" eyebrow={socketConnected ? "live terminal" : "reconnecting"}>
@@ -546,9 +638,157 @@ export default function TradingPage() {
           </PixelCard>
         </div>
       </section>
+      )}
 
       {error ? <p className="glass-panel rounded-[8px] border-red-200/80 bg-red-100/80 p-3 text-sm text-red-950">{error}</p> : null}
     </main>
+  );
+}
+
+function CryptoModePanel({
+  portfolio,
+  settings,
+  logs,
+  isChecking,
+  isCashAdjusting,
+  onUpdateSettings,
+  onCheckNow,
+  onAdjustCash
+}: {
+  portfolio: Portfolio | null;
+  settings: CryptoTraderSettings | null;
+  logs: CryptoTraderLog[];
+  isChecking: boolean;
+  isCashAdjusting: boolean;
+  onUpdateSettings: (patch: CryptoTraderSettingsUpdate) => void;
+  onCheckNow: () => void;
+  onAdjustCash: (amount: 10000 | -10000) => void;
+}) {
+  const selected = settings?.selectedCoins ?? ["BTC"];
+  const cryptoPositions = (portfolio?.positions ?? []).filter((position) => ["BTC", "ETH", "SOL"].includes(position.ticker));
+
+  function toggleCoin(symbol: "BTC" | "ETH" | "SOL") {
+    const has = selected.includes(symbol);
+    const next = has ? selected.filter((coin) => coin !== symbol) : [...selected, symbol];
+    if (next.length < 1 || next.length > 2) return;
+    onUpdateSettings({ selectedCoins: next });
+  }
+
+  return (
+    <section className="grid gap-3 xl:grid-cols-[340px_1fr_380px]">
+      <div className="grid gap-3">
+        <PixelCard title="Crypto Bot" eyebrow={settings?.enabled ? "auto loop enabled" : "auto loop paused"}>
+          <div className="grid grid-cols-2 gap-2">
+            <PixelButton tone={settings?.enabled ? "good" : "neutral"} onClick={() => onUpdateSettings({ enabled: !settings?.enabled })} disabled={!settings}>
+              {settings?.enabled ? "Enabled" : "Enable"}
+            </PixelButton>
+            <PixelButton tone="magic" onClick={onCheckNow} disabled={!settings || isChecking}>
+              {isChecking ? "Checking" : "Check Now"}
+            </PixelButton>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-600">
+            When enabled, the backend checks CoinGecko every 30 minutes and can place fake BUY/SELL trades automatically.
+          </p>
+          <div className="mt-3 grid gap-2">
+            <label className="grid gap-1 text-xs font-black uppercase">
+              Max trades/day
+              <select value={settings?.maxTradesPerDay ?? 4} onChange={(event) => onUpdateSettings({ maxTradesPerDay: Number(event.target.value) })} className={compactInputClass} disabled={!settings}>
+                {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs font-black uppercase">
+              Stop-loss %
+              <input type="number" min={1} max={25} value={settings?.stopLossPercent ?? 4} onChange={(event) => onUpdateSettings({ stopLossPercent: Number(event.target.value || 4) })} className={compactInputClass} disabled={!settings} />
+            </label>
+            <label className="grid gap-1 text-xs font-black uppercase">
+              Max per coin %
+              <input type="number" min={1} max={20} value={settings?.maxPortfolioPercent ?? 20} onChange={(event) => onUpdateSettings({ maxPortfolioPercent: Number(event.target.value || 20) })} className={compactInputClass} disabled={!settings} />
+            </label>
+          </div>
+        </PixelCard>
+
+        <PixelCard title="Virtual Cash" eyebrow="same simulator wallet">
+          <div className="grid grid-cols-2 gap-2">
+            <StatTile label="Cash" value={portfolio ? formatMoney(portfolio.cash) : "--"} />
+            <StatTile label="Equity" value={portfolio ? formatMoney(portfolio.totalValue) : "--"} />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <PixelButton tone="good" onClick={() => onAdjustCash(10000)} disabled={isCashAdjusting}>
+              + $10,000
+            </PixelButton>
+            <PixelButton tone="warn" onClick={() => onAdjustCash(-10000)} disabled={isCashAdjusting || (portfolio?.cash ?? 0) < 10000}>
+              - $10,000
+            </PixelButton>
+          </div>
+        </PixelCard>
+      </div>
+
+      <div className="grid gap-3">
+        <PixelCard title="Coins" eyebrow="choose one or two">
+          <div className="grid gap-3 md:grid-cols-3">
+            {(["BTC", "ETH", "SOL"] as const).map((symbol) => {
+              const position = cryptoPositions.find((item) => item.ticker === symbol);
+              const isSelected = selected.includes(symbol);
+              return (
+                <button
+                  key={symbol}
+                  className={cx("min-h-44 rounded-[8px] border p-3 text-left shadow-[0_16px_34px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:-translate-y-0.5", isSelected ? "border-emerald-300 bg-emerald-50/86" : "border-white/65 bg-white/58 hover:bg-white/78")}
+                  onClick={() => toggleCoin(symbol)}
+                  disabled={!settings || (!isSelected && selected.length >= 2)}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-pixel text-lg">{symbol}</span>
+                    <span className={cx("rounded-full border px-2 py-1 text-[10px] font-black uppercase", isSelected ? "border-emerald-300 bg-emerald-100 text-emerald-950" : "border-slate-200 bg-white/70 text-slate-600")}>{isSelected ? "selected" : "idle"}</span>
+                  </div>
+                  <div className="mt-4 grid gap-1 text-xs text-slate-700">
+                    <p>Held: {formatQuantity(position?.quantity ?? 0)}</p>
+                    <p>Avg cost: {formatMoney(position?.averageCost ?? 0)}</p>
+                    <p>Market value: {formatMoney(position?.marketValue ?? 0)}</p>
+                    <p>Exposure: {formatSignedPercent(position?.portfolioWeight ?? 0)}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </PixelCard>
+
+        <PixelCard title="Crypto Positions" eyebrow="fake-money holdings">
+          {cryptoPositions.length === 0 ? (
+            <p className="glass-chip rounded-[8px] p-3 text-xs text-slate-600">No crypto positions yet. Enable the bot or run Check Now after selecting coins.</p>
+          ) : (
+            <PositionsPanel positions={cryptoPositions} onSelect={() => undefined} />
+          )}
+        </PixelCard>
+      </div>
+
+      <div className="grid gap-3">
+        <PixelCard title="Bot Log" eyebrow="buy / sell / hold reasons">
+          <div className="grid max-h-[620px] gap-2 overflow-auto pr-1">
+            {logs.map((log) => (
+              <div key={log.id} className="rounded-[8px] border border-white/65 bg-white/58 p-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-pixel text-[10px]">{log.ticker}</span>
+                    <span className={recommendationPill(log.action === "SELL" ? "AVOID" : log.action)}>{log.action}</span>
+                  </div>
+                  <span className="text-slate-500">{formatDateTime(log.createdAt)}</span>
+                </div>
+                <p className="mt-2 leading-5 text-slate-800">{log.reason}</p>
+                <div className="mt-2 grid grid-cols-2 gap-1 text-slate-600">
+                  <span>Score {Math.round(log.score)}</span>
+                  <span>{log.price ? formatMoney(log.price) : "No price"}</span>
+                  <span>{log.notional ? formatMoney(log.notional) : "No trade"}</span>
+                  <span>{log.quantity ? formatQuantity(log.quantity) : "0 qty"}</span>
+                </div>
+              </div>
+            ))}
+            {logs.length === 0 ? <p className="glass-chip rounded-[8px] p-3 text-xs text-slate-600">No crypto bot logs yet.</p> : null}
+          </div>
+        </PixelCard>
+      </div>
+    </section>
   );
 }
 
@@ -597,7 +837,7 @@ function PositionsPanel({ positions, onSelect }: { positions: Portfolio["positio
       {positions.map((position) => (
         <div key={position.ticker} className="grid grid-cols-[70px_1fr_auto] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
           <button className="text-left font-pixel text-[10px]" onClick={() => onSelect(position.ticker)}>{position.ticker}</button>
-          <span>{position.quantity} sh @ {formatMoney(position.averageCost)} | MV {formatMoney(position.marketValue)}</span>
+          <span>{formatQuantity(position.quantity)} @ {formatMoney(position.averageCost)} | MV {formatMoney(position.marketValue)}</span>
           <span className={(position.unrealizedPnl ?? 0) >= 0 ? "font-semibold text-emerald-800" : "font-semibold text-red-800"}>{formatSignedPercent(position.unrealizedPnlPercent)}</span>
         </div>
       ))}
@@ -613,7 +853,7 @@ function OrdersPanel({ orders, onCancel }: { orders: Order[]; onCancel: (id: str
         <div key={order.id} className="grid grid-cols-[54px_54px_1fr_auto] items-center gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
           <span className={order.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-red-800"}>{order.side}</span>
           <span>{order.ticker}</span>
-          <span>{order.quantity - order.filledQuantity} open / {order.quantity} {order.orderType} {order.limitPrice ? `LMT ${formatMoney(order.limitPrice)}` : ""}{order.stopPrice ? `STP ${formatMoney(order.stopPrice)}` : ""}</span>
+          <span>{formatQuantity(order.quantity - order.filledQuantity)} open / {formatQuantity(order.quantity)} {order.orderType} {order.limitPrice ? `LMT ${formatMoney(order.limitPrice)}` : ""}{order.stopPrice ? `STP ${formatMoney(order.stopPrice)}` : ""}</span>
           <button className="rounded-full border border-red-200/80 bg-red-100/85 px-2 py-1 font-black text-red-900" onClick={() => onCancel(order.id)}>Cancel</button>
         </div>
       ))}
@@ -629,7 +869,7 @@ function FillsPanel({ trades }: { trades: Trade[] }) {
         <div key={trade.id} className="grid grid-cols-[54px_60px_1fr_auto] gap-2 border-b border-slate-200 px-2 py-2 text-xs last:border-b-0">
           <span className={trade.side === "BUY" ? "font-semibold text-emerald-800" : "font-semibold text-red-800"}>{trade.side}</span>
           <span>{trade.ticker}</span>
-          <span>{trade.quantity} @ {formatMoney(trade.price)} {trade.orderType ? `(${trade.orderType})` : ""}</span>
+          <span>{formatQuantity(trade.quantity)} @ {formatMoney(trade.price)} {trade.orderType ? `(${trade.orderType})` : ""}</span>
           <span>{formatTime(trade.createdAt)}</span>
         </div>
       ))}
@@ -660,8 +900,24 @@ function formatTime(value: string) {
   return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function formatQuantity(value: number) {
+  if (Number.isInteger(value)) return String(value);
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(value);
+}
+
 function formatAge(ms: number) {
   if (!Number.isFinite(ms) || ms < 0) return "unknown";
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
   return `${Math.round(ms / 60_000)}m`;
+}
+
+function recommendationPill(value: string) {
+  const base = "rounded-full border px-2 py-1 text-[10px] font-black uppercase";
+  if (value === "BUY") return `${base} border-emerald-200/80 bg-emerald-100/80 text-emerald-950`;
+  if (value === "AVOID") return `${base} border-red-200/80 bg-red-100/80 text-red-950`;
+  return `${base} border-amber-200/80 bg-amber-100/80 text-amber-950`;
 }

@@ -27,6 +27,8 @@ export async function createIntegrationApp(): Promise<{ app: INestApplication; p
 export async function resetDb(prisma: PrismaService) {
   await prisma.agentResult.deleteMany();
   await prisma.analysisRun.deleteMany();
+  await prisma.cryptoTraderLog.deleteMany();
+  await prisma.cryptoTraderSettings.deleteMany();
   await prisma.trade.deleteMany();
   await prisma.order.deleteMany();
   await prisma.position.deleteMany();

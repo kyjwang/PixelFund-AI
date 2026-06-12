@@ -14,6 +14,7 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
 import { BacktestsModule } from "./backtests/backtests.module";
 import { HealthModule } from "./health/health.module";
 import { OrdersModule } from "./orders/orders.module";
+import { CryptoTraderModule } from "./crypto-trader/crypto-trader.module";
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { OrdersModule } from "./orders/orders.module";
     BacktestsModule,
     WatchlistModule,
     HealthModule,
+    CryptoTraderModule,
     QuotesModule,
     WsModule
   ],

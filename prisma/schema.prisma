@@ -59,6 +59,12 @@ enum Recommendation {
   AVOID
 }
 
+enum CryptoTraderAction {
+  BUY
+  SELL
+  HOLD
+}
+
 model DemoAccount {
   id        String      @id @default(cuid())
   ownerKey  String      @unique @default("demo")
@@ -76,7 +82,7 @@ model Position {
   accountId   String
   account     DemoAccount @relation(fields: [accountId], references: [id])
   ticker      String
-  quantity    Int
+  quantity    Float
   averageCost Float
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -92,7 +98,7 @@ model Trade {
   order     Order?      @relation(fields: [orderId], references: [id])
   ticker    String
   side      TradeSide
-  quantity  Int
+  quantity  Float
   price     Float
   orderType OrderType   @default(MARKET)
   requestedPrice Float?
@@ -107,8 +113,8 @@ model Order {
   account   DemoAccount @relation(fields: [accountId], references: [id])
   ticker    String
   side      TradeSide
-  quantity  Int
-  filledQuantity Int     @default(0)
+  quantity  Float
+  filledQuantity Float   @default(0)
   status    OrderStatus @default(PENDING)
   orderType OrderType   @default(MARKET)
   limitPrice Float?
@@ -134,6 +140,40 @@ model WatchlistItem {
   createdAt DateTime @default(now())
 
   @@unique([ownerKey, ticker])
+}
+
+model CryptoTraderSettings {
+  id                  String   @id @default(cuid())
+  ownerKey            String   @unique @default("demo")
+  enabled             Boolean  @default(false)
+  selectedCoins       String[] @default(["BTC"])
+  maxTradesPerDay     Int      @default(4)
+  stopLossPercent     Float    @default(4)
+  maxPortfolioPercent Float    @default(20)
+  lastCheckedAt       DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model CryptoTraderLog {
+  id          String             @id @default(cuid())
+  ownerKey    String             @default("demo")
+  swedenDay   String
+  ticker      String
+  coinId      String
+  action      CryptoTraderAction
+  score       Float
+  reason      String
+  reasons     Json
+  price       Float?
+  quantity    Float?
+  notional    Float?
+  tradeId     String?
+  createdAt   DateTime           @default(now())
+
+  @@index([ownerKey, swedenDay])
+  @@index([ownerKey, createdAt])
+  @@index([ownerKey, ticker, createdAt])
 }
 
 model AnalysisRun {

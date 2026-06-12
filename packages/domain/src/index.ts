@@ -238,9 +238,9 @@ export function applyTrade(
     return { cash: cash - gross, positions: next, realizedPnlDelta: 0 };
   }
 
-  if (existing.quantity < quantity) throw new Error("INSUFFICIENT_SHARES");
+  if (existing.quantity + 1e-8 < quantity) throw new Error("INSUFFICIENT_SHARES");
   const remaining = existing.quantity - quantity;
-  if (remaining === 0 && idx >= 0) next.splice(idx, 1);
+  if (remaining <= 1e-8 && idx >= 0) next.splice(idx, 1);
   else if (idx >= 0) next[idx] = { ...existing, quantity: remaining };
 
   const realizedPnlDelta = (price - existing.averageCost) * quantity;

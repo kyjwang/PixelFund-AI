@@ -54,6 +54,7 @@ npm run dev
 - [Roadmap](docs/ROADMAP.md)
 - [Incident Runbook](docs/INCIDENT_RUNBOOK.md)
 - [Data Provider Comparison](docs/DATA_PROVIDER_COMPARISON.md)
+- [Why Not yfinance](docs/WHY_NOT_YFINANCE.md)
 - [Changelog](docs/CHANGELOG.md)
 - [Demo Script](docs/showcase/DEMO_SCRIPT.md)
 - [Limitations & Next Steps](docs/showcase/LIMITATIONS_AND_NEXT_STEPS.md)
