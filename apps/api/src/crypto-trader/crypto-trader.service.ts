@@ -206,11 +206,18 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
     const price = context?.priceUsd ?? candles.at(-1)?.close ?? 0;
     if (!asset || price <= 0 || candles.length === 0) {
       const reason =
-        price <= 0
+        price <= 0 && candles.length === 0
+          ? "HOLD because all public CoinGecko price and candle endpoints returned no usable crypto data."
+          : price <= 0
           ? "HOLD because CoinGecko did not return a usable live crypto price."
           : "HOLD because CoinGecko OHLC candles were unavailable; the bot needs candles for SMA, momentum, and volatility checks.";
       const reasons =
-        price <= 0
+        price <= 0 && candles.length === 0
+          ? [
+              "CoinGecko simple price, markets, coin details, OHLC, and market-chart fallbacks returned no usable data.",
+              "This usually means the backend host is rate-limited, blocked, timed out, or cannot reach CoinGecko public endpoints."
+            ]
+          : price <= 0
           ? ["CoinGecko simple price returned no usable USD value.", "No fake trade was placed because the bot cannot size a trade without price data."]
           : ["CoinGecko simple price worked, but OHLC history returned no usable candles.", "No fake trade was placed because the strategy cannot calculate trend, momentum, or volatility without candles."];
       return this.saveLog({

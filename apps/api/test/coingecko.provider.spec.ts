@@ -47,6 +47,39 @@ describe("CoinGecko provider public fallbacks", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
+  test("uses coin detail market data when simple price and markets fallback are unavailable", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (url) => {
+      const href = String(url);
+      if (href.includes("/simple/price")) return jsonResponse({ error: "rate limited" }, 429);
+      if (href.includes("/coins/markets")) return jsonResponse({ error: "blocked" }, 403);
+      if (href.includes("/coins/bitcoin")) {
+        return jsonResponse({
+          id: "bitcoin",
+          market_data: {
+            current_price: { usd: 102500 },
+            price_change_percentage_24h: -1.2,
+            market_cap: { usd: 2_020_000_000_000 },
+            total_volume: { usd: 39_000_000_000 }
+          },
+          last_updated: "2026-06-12T15:05:00.000Z"
+        });
+      }
+      throw new Error(`Unexpected URL ${href}`);
+    }) as any;
+
+    const context = await new CoinGeckoProvider().cryptoContext("BTC");
+
+    expect(context).toEqual(
+      expect.objectContaining({
+        asset: "bitcoin",
+        priceUsd: 102500,
+        change24hPercent: -1.2,
+        source: "coingecko-coin-details"
+      })
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
   test("uses market chart fallback when OHLC candles are unavailable without an API key", async () => {
     const start = Date.UTC(2026, 5, 12, 12);
     const fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (url) => {

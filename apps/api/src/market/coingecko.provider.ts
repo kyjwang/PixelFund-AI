@@ -46,6 +46,17 @@ type MarketChartPayload = {
   total_volumes?: Array<[number, number]>;
 };
 
+type CoinDetailsPayload = {
+  id?: string;
+  market_data?: {
+    current_price?: { usd?: number };
+    price_change_percentage_24h?: number;
+    market_cap?: { usd?: number };
+    total_volume?: { usd?: number };
+  };
+  last_updated?: string;
+};
+
 @Injectable()
 export class CoinGeckoProvider implements MarketDataProvider {
   private readonly contextCache = new Map<string, CacheEntry<CryptoContext>>();
@@ -105,7 +116,7 @@ export class CoinGeckoProvider implements MarketDataProvider {
           source: "coingecko",
           updatedAt: item.last_updated_at ? new Date(item.last_updated_at * 1000).toISOString() : new Date().toISOString()
         }
-      : await this.cryptoContextFromMarkets(asset);
+      : (await this.cryptoContextFromMarkets(asset)) ?? (await this.cryptoContextFromCoinDetails(asset));
 
     if (context) this.contextCache.set(cacheKey, { data: context, expiresAt: Date.now() + simplePriceCacheMs });
     return context;
@@ -157,6 +168,23 @@ export class CoinGeckoProvider implements MarketDataProvider {
       volume24hUsd: item.total_volume,
       source: "coingecko",
       updatedAt: item.last_updated ?? new Date().toISOString()
+    };
+  }
+
+  private async cryptoContextFromCoinDetails(asset: string): Promise<CryptoContext | null> {
+    const data = await fetchJson<CoinDetailsPayload>(
+      `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(asset)}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`
+    );
+    const price = data?.market_data?.current_price?.usd;
+    if (!price) return null;
+    return {
+      asset,
+      priceUsd: price,
+      change24hPercent: data.market_data?.price_change_percentage_24h ?? 0,
+      marketCapUsd: data.market_data?.market_cap?.usd,
+      volume24hUsd: data.market_data?.total_volume?.usd,
+      source: "coingecko-coin-details",
+      updatedAt: data.last_updated ?? new Date().toISOString()
     };
   }
 
