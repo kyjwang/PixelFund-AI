@@ -22,6 +22,7 @@ import {
   watchlistItemSchema
 } from "@pixelfund/schemas";
 import { CoinGeckoProvider } from "../../src/market/coingecko.provider";
+import { YahooCryptoProvider } from "../../src/crypto-trader/yahoo-crypto.provider";
 
 describe("http integration", () => {
   let app: INestApplication;
@@ -404,6 +405,53 @@ describe("http integration", () => {
     } finally {
       historySpy.mockRestore();
       contextSpy.mockRestore();
+    }
+  });
+
+  test("crypto trader check uses Yahoo/yfinance fallback when CoinGecko data is unavailable", async () => {
+    const risingCandles = Array.from({ length: 24 }, (_, index) => {
+      const price = 100 + index * 2;
+      return {
+        timestamp: new Date(Date.UTC(2026, 5, 12, index)).toISOString(),
+        open: price - 1,
+        high: price + 2,
+        low: price - 2,
+        close: price,
+        volume: 0
+      };
+    });
+    const historySpy = jest.spyOn(CoinGeckoProvider.prototype, "cryptoHistory").mockResolvedValue(null);
+    const contextSpy = jest.spyOn(CoinGeckoProvider.prototype, "cryptoContext").mockResolvedValue(null);
+    const yahooSpy = jest.spyOn(YahooCryptoProvider.prototype, "cryptoMarketData").mockImplementation(async (symbol) => ({
+      symbol,
+      price: 150,
+      candles: risingCandles,
+      source: "Yahoo/yfinance research fallback",
+      asOf: "2026-06-12T12:00:00.000Z",
+      warnings: [],
+      isFallback: true
+    }));
+
+    try {
+      const owner = "crypto-yahoo-fallback-a";
+      await request(server)
+        .put("/crypto-trader/settings")
+        .set("x-demo-user-id", owner)
+        .send({ enabled: true, selectedCoins: ["BTC"], maxTradesPerDay: 4, stopLossPercent: 4, maxPortfolioPercent: 20 })
+        .expect(200);
+
+      const checked = await request(server).post("/crypto-trader/check-now").set("x-demo-user-id", owner).expect(201);
+      const parsed = cryptoTraderCheckResultSchema.parse(checked.body.data);
+
+      expect(parsed.logs).toHaveLength(1);
+      expect(parsed.logs[0].action).toBe("BUY");
+      expect(parsed.logs[0].reason).toContain("CoinGecko unavailable; used Yahoo/yfinance fallback data.");
+      expect(parsed.logs[0].reasons.join(" ")).toContain("Data source: Yahoo/yfinance research fallback");
+      expect(parsed.logs[0].tradeId).toBeTruthy();
+    } finally {
+      historySpy.mockRestore();
+      contextSpy.mockRestore();
+      yahooSpy.mockRestore();
     }
   });
 

@@ -35,3 +35,13 @@ export type CryptoSignal = {
   reasons: string[];
   notional: number;
 };
+
+export type CryptoMarketDataBundle = {
+  symbol: CryptoSymbol;
+  price: number;
+  candles: CryptoCandle[];
+  source: string;
+  asOf: string | null;
+  warnings: string[];
+  isFallback: boolean;
+};

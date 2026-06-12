@@ -5,12 +5,17 @@ import type { CryptoSymbol, CryptoTraderSettingsUpdate } from "@pixelfund/schema
 import { PrismaService } from "../common/prisma.service";
 import { DomainError } from "../common/errors/domain.error";
 import { PortfolioService } from "../portfolio/portfolio.service";
-import { CoinGeckoProvider, coinGeckoAssetForTicker } from "../market/coingecko.provider";
 import { EventsGateway } from "../ws/events.gateway";
+import { CryptoMarketDataService } from "./crypto-market-data.service";
 import { evaluateCryptoSignal } from "./crypto-trader.strategy";
-import type { CryptoCandle } from "./crypto-trader.types";
+import type { CryptoMarketDataBundle } from "./crypto-trader.types";
 
 const cryptoSymbols: CryptoSymbol[] = ["BTC", "ETH", "SOL"];
+const cryptoCoinIds: Record<CryptoSymbol, string> = {
+  BTC: "bitcoin",
+  ETH: "ethereum",
+  SOL: "solana"
+};
 const checkIntervalMs = 30 * 60 * 1000;
 
 type NormalizedCryptoTraderSettings = Omit<PrismaCryptoTraderSettings, "selectedCoins"> & {
@@ -24,7 +29,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly portfolio: PortfolioService,
-    private readonly coinGecko: CoinGeckoProvider,
+    private readonly marketData: CryptoMarketDataService,
     private readonly events: EventsGateway
   ) {}
 
@@ -149,7 +154,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
     const settings = await this.getSettings(ownerKey);
     const checkedAt = now.toISOString();
     const swedenDay = swedenDayKey(now);
-    const btcCandles = await this.cryptoCandles("BTC");
+    const btcData = await this.marketData.resolve("BTC");
     const logs = [];
     let tradesToday = await this.tradesToday(settings.ownerKey, swedenDay);
 
@@ -173,7 +178,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
         continue;
       }
 
-      const decision = await this.evaluateCoin(settings, symbol, btcCandles, tradesToday, now, swedenDay);
+      const decision = await this.evaluateCoin(settings, symbol, btcData, tradesToday, now, swedenDay);
       logs.push(decision);
       if (decision.tradeId) tradesToday += 1;
     }
@@ -199,35 +204,19 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async evaluateCoin(settings: NormalizedCryptoTraderSettings, symbol: CryptoSymbol, btcCandles: CryptoCandle[], tradesToday: number, now: Date, swedenDay: string) {
-    const asset = coinGeckoAssetForTicker(symbol);
-    const context = await this.coinGecko.cryptoContext(symbol);
-    const candles = await this.cryptoCandles(symbol);
-    const price = context?.priceUsd ?? candles.at(-1)?.close ?? 0;
-    if (!asset || price <= 0 || candles.length === 0) {
-      const reason =
-        price <= 0 && candles.length === 0
-          ? "HOLD because all public CoinGecko price and candle endpoints returned no usable crypto data."
-          : price <= 0
-          ? "HOLD because CoinGecko did not return a usable live crypto price."
-          : "HOLD because CoinGecko OHLC candles were unavailable; the bot needs candles for SMA, momentum, and volatility checks.";
-      const reasons =
-        price <= 0 && candles.length === 0
-          ? [
-              "CoinGecko simple price, markets, coin details, OHLC, and market-chart fallbacks returned no usable data.",
-              "This usually means the backend host is rate-limited, blocked, timed out, or cannot reach CoinGecko public endpoints."
-            ]
-          : price <= 0
-          ? ["CoinGecko simple price returned no usable USD value.", "No fake trade was placed because the bot cannot size a trade without price data."]
-          : ["CoinGecko simple price worked, but OHLC history returned no usable candles.", "No fake trade was placed because the strategy cannot calculate trend, momentum, or volatility without candles."];
+  private async evaluateCoin(settings: NormalizedCryptoTraderSettings, symbol: CryptoSymbol, btcData: CryptoMarketDataBundle, tradesToday: number, now: Date, swedenDay: string) {
+    const data = symbol === "BTC" ? btcData : await this.marketData.resolve(symbol);
+    const price = data.price;
+    const candles = data.candles;
+    if (price <= 0 || candles.length === 0) {
       return this.saveLog({
         ownerKey: settings.ownerKey,
         swedenDay,
         symbol,
         action: "HOLD",
         score: 0,
-        reason,
-        reasons,
+        reason: "HOLD because no crypto market data was available from CoinGecko or Yahoo/yfinance fallback.",
+        reasons: data.warnings.length ? data.warnings : ["No fake trade was placed because the bot could not get real public crypto price/candle data."],
         price: price || null,
         quantity: null,
         notional: null,
@@ -245,7 +234,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
       symbol,
       price,
       candles,
-      btcCandles,
+      btcCandles: btcData.candles,
       heldQuantity: position?.quantity ?? 0,
       averageCost: position?.averageCost ?? 0,
       portfolioValue: portfolio.totalValue,
@@ -278,25 +267,13 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
       symbol,
       action: tradeId ? signal.action : "HOLD",
       score: signal.score,
-      reason: tradeId ? signal.reason : signal.action === "HOLD" ? signal.reason : `${signal.action} signal skipped because risk or position rules blocked execution.`,
-      reasons: signal.reasons.length ? signal.reasons : [signal.reason],
+      reason: reasonWithSource(tradeId ? signal.reason : signal.action === "HOLD" ? signal.reason : `${signal.action} signal skipped because risk or position rules blocked execution.`, data),
+      reasons: [...dataSourceReasons(data), ...(signal.reasons.length ? signal.reasons : [signal.reason])],
       price,
       quantity,
       notional,
       tradeId
     });
-  }
-
-  private async cryptoCandles(symbol: CryptoSymbol): Promise<CryptoCandle[]> {
-    const candles = (await this.coinGecko.cryptoHistory(symbol, 1)) ?? (await this.coinGecko.cryptoHistory(symbol, 7));
-    return (candles ?? []).map((candle) => ({
-      timestamp: candle.date,
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close,
-      volume: candle.volume
-    }));
   }
 
   private async tradesToday(ownerKey: string, swedenDay: string) {
@@ -368,13 +345,12 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
     notional: number | null;
     tradeId: string | null;
   }) {
-    const asset = coinGeckoAssetForTicker(input.symbol) ?? input.symbol.toLowerCase();
     return this.prisma.cryptoTraderLog.create({
       data: {
         ownerKey: input.ownerKey,
         swedenDay: input.swedenDay,
         ticker: input.symbol,
-        coinId: asset,
+        coinId: cryptoCoinIds[input.symbol],
         action: input.action,
         score: input.score,
         reason: input.reason,
@@ -405,6 +381,15 @@ function normalizeLog<T extends { reasons: unknown; ticker: string }>(log: T) {
 
 function uniqueCoins(coins: readonly string[]) {
   return Array.from(new Set(coins.map((coin) => coin.trim().toUpperCase()).filter((coin): coin is CryptoSymbol => cryptoSymbols.includes(coin as CryptoSymbol))));
+}
+
+function reasonWithSource(reason: string, data: CryptoMarketDataBundle) {
+  if (!data.isFallback) return reason;
+  return `${reason} CoinGecko unavailable; used Yahoo/yfinance fallback data.`;
+}
+
+function dataSourceReasons(data: CryptoMarketDataBundle) {
+  return [`Data source: ${data.source}${data.isFallback ? " (fallback)" : ""}.`, ...data.warnings];
 }
 
 function swedenDayKey(date: Date) {
