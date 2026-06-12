@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, Post, Put, Query } from "@nestjs/common";
 import { cryptoCashAdjustmentSchema, cryptoTraderSettingsUpdateSchema } from "@pixelfund/schemas";
 import { CryptoTraderService } from "./crypto-trader.service";
 
@@ -31,5 +31,10 @@ export class CryptoTraderController {
   cashAdjustment(@Body() body: unknown, @Headers("x-demo-user-id") ownerKey?: string) {
     const payload = cryptoCashAdjustmentSchema.parse(body);
     return this.cryptoTrader.adjustCash(payload.amount, ownerKey);
+  }
+
+  @Delete("demo-data")
+  clearDemoData(@Headers("x-demo-user-id") ownerKey?: string) {
+    return this.cryptoTrader.clearDemoData(ownerKey);
   }
 }

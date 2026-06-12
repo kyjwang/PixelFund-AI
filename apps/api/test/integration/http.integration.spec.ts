@@ -16,6 +16,7 @@ import {
   stockHistorySchema,
   tradeSchema,
   cryptoTraderCheckResultSchema,
+  cryptoTraderClearDataResultSchema,
   cryptoTraderLogSchema,
   cryptoTraderSettingsSchema,
   watchlistItemSchema
@@ -404,6 +405,61 @@ describe("http integration", () => {
       historySpy.mockRestore();
       contextSpy.mockRestore();
     }
+  });
+
+  test("crypto trader data clear removes only the current demo account data", async () => {
+    const owner = "crypto-clear-a";
+    const otherOwner = "crypto-clear-b";
+    const ownerAccount = await prisma.demoAccount.create({ data: { ownerKey: owner, cash: 90000, realizedPnl: 123 } });
+    const otherAccount = await prisma.demoAccount.create({ data: { ownerKey: otherOwner, cash: 70000 } });
+    const run = await prisma.analysisRun.create({ data: { ownerKey: owner, ticker: "BTC", status: "COMPLETED" } });
+
+    await prisma.agentResult.create({ data: { analysisRunId: run.id, agentType: "PORTFOLIO_MANAGER", status: "COMPLETED", summary: "Done" } });
+    await prisma.cryptoTraderSettings.create({ data: { ownerKey: owner, enabled: true, selectedCoins: ["BTC"] } });
+    await prisma.cryptoTraderLog.create({
+      data: {
+        ownerKey: owner,
+        swedenDay: "2026-06-12",
+        ticker: "BTC",
+        coinId: "bitcoin",
+        action: "HOLD",
+        score: 0,
+        reason: "HOLD",
+        reasons: ["No signal"]
+      }
+    });
+    await prisma.watchlistItem.create({ data: { ownerKey: owner, ticker: "NVDA" } });
+    await prisma.position.create({ data: { accountId: ownerAccount.id, ticker: "BTC", quantity: 0.1, averageCost: 100000 } });
+    await prisma.order.create({ data: { accountId: ownerAccount.id, ticker: "BTC", side: "BUY", quantity: 0.1, status: "FILLED" } });
+    await prisma.trade.create({ data: { accountId: ownerAccount.id, ticker: "BTC", side: "BUY", quantity: 0.1, price: 100000 } });
+    await prisma.cryptoTraderLog.create({
+      data: {
+        ownerKey: otherOwner,
+        swedenDay: "2026-06-12",
+        ticker: "ETH",
+        coinId: "ethereum",
+        action: "HOLD",
+        score: 0,
+        reason: "Other HOLD",
+        reasons: ["Other owner"]
+      }
+    });
+
+    const cleared = await request(server).delete("/crypto-trader/demo-data").set("x-demo-user-id", owner).expect(200);
+    const parsed = cryptoTraderClearDataResultSchema.parse(cleared.body.data);
+
+    expect(parsed.deletedAnalysisRuns).toBe(1);
+    expect(parsed.deletedAgentResults).toBe(1);
+    expect(parsed.deletedCryptoLogs).toBe(1);
+    expect(parsed.deletedCryptoSettings).toBe(1);
+    expect(parsed.deletedTrades).toBe(1);
+    expect(parsed.deletedOrders).toBe(1);
+    expect(parsed.deletedPositions).toBe(1);
+    expect(parsed.deletedWatchlistItems).toBe(1);
+    expect(parsed.deletedAccounts).toBe(1);
+    expect(await prisma.demoAccount.findUnique({ where: { id: ownerAccount.id } })).toBeNull();
+    expect(await prisma.demoAccount.findUnique({ where: { id: otherAccount.id } })).toBeTruthy();
+    expect(await prisma.cryptoTraderLog.count({ where: { ownerKey: otherOwner } })).toBe(1);
   });
 
   test("isolates watchlists by demo account header", async () => {

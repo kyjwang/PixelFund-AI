@@ -77,7 +77,7 @@ export class CoinGeckoProvider implements MarketDataProvider {
     };
   }
 
-  async cryptoHistory(ticker: string, days: 1 | 2 = 1): Promise<HistoricalCandle[] | null> {
+  async cryptoHistory(ticker: string, days: 1 | 7 = 1): Promise<HistoricalCandle[] | null> {
     const normalized = ticker.trim().toUpperCase();
     const asset = directAssets[normalized];
     if (!asset) return null;

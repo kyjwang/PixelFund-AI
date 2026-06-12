@@ -9,6 +9,7 @@ import {
   analysisExplanationSchema,
   analysisRunSchema,
   cryptoCashAdjustmentSchema,
+  cryptoTraderClearDataResultSchema,
   cryptoTraderCheckResultSchema,
   cryptoTraderLogSchema,
   cryptoTraderSettingsSchema,
@@ -76,6 +77,8 @@ export default function TradingPage() {
   const [quoteStale, setQuoteStale] = useState(false);
   const [isCryptoChecking, setIsCryptoChecking] = useState(false);
   const [isCashAdjusting, setIsCashAdjusting] = useState(false);
+  const [isCryptoClearing, setIsCryptoClearing] = useState(false);
+  const [cryptoClearNotice, setCryptoClearNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const tickerRef = useRef(ticker);
@@ -377,6 +380,28 @@ export default function TradingPage() {
     }
   }
 
+  async function clearCryptoDemoData() {
+    const ok = window.confirm("Clear this demo account's backend data? This deletes AI analyses, crypto bot logs/settings, watchlist, orders, fills, positions, and resets virtual cash. It does not delete other demo users.");
+    if (!ok) return;
+    setIsCryptoClearing(true);
+    try {
+      const result = await api("/crypto-trader/demo-data", cryptoTraderClearDataResultSchema, { method: "DELETE" });
+      setCryptoClearNotice(`Cleared ${result.deletedAnalysisRuns} analyses, ${result.deletedCryptoLogs} bot logs, ${result.deletedTrades} fills, ${result.deletedOrders} orders, and ${result.deletedPositions} positions.`);
+      setCryptoLogs([]);
+      setCryptoSettings(null);
+      setOrders([]);
+      setTrades([]);
+      setWatchlist([]);
+      setRuns([]);
+      await refresh(normalizedTicker, range);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to clear demo data");
+    } finally {
+      setIsCryptoClearing(false);
+    }
+  }
+
   const blockingWarning = (orderPreview?.warnings ?? []).some((warning) => warning.toLowerCase().includes("insufficient"));
   const canSubmit = Boolean(orderPreview && terminalTradable && !blockingWarning && !isSubmitting);
 
@@ -410,6 +435,9 @@ export default function TradingPage() {
           onUpdateSettings={(patch) => void updateCryptoSettings(patch)}
           onCheckNow={() => void runCryptoCheck()}
           onAdjustCash={(amount) => void adjustCryptoCash(amount)}
+          onClearData={() => void clearCryptoDemoData()}
+          isClearing={isCryptoClearing}
+          clearNotice={cryptoClearNotice}
         />
       ) : (
       <section className="grid gap-3 xl:grid-cols-[320px_1fr_360px]">
@@ -651,21 +679,28 @@ function CryptoModePanel({
   logs,
   isChecking,
   isCashAdjusting,
+  isClearing,
+  clearNotice,
   onUpdateSettings,
   onCheckNow,
-  onAdjustCash
+  onAdjustCash,
+  onClearData
 }: {
   portfolio: Portfolio | null;
   settings: CryptoTraderSettings | null;
   logs: CryptoTraderLog[];
   isChecking: boolean;
   isCashAdjusting: boolean;
+  isClearing: boolean;
+  clearNotice: string | null;
   onUpdateSettings: (patch: CryptoTraderSettingsUpdate) => void;
   onCheckNow: () => void;
   onAdjustCash: (amount: 10000 | -10000) => void;
+  onClearData: () => void;
 }) {
   const selected = settings?.selectedCoins ?? ["BTC"];
   const cryptoPositions = (portfolio?.positions ?? []).filter((position) => ["BTC", "ETH", "SOL"].includes(position.ticker));
+  const autoRunOn = Boolean(settings?.enabled);
 
   function toggleCoin(symbol: "BTC" | "ETH" | "SOL") {
     const has = selected.includes(symbol);
@@ -677,18 +712,38 @@ function CryptoModePanel({
   return (
     <section className="grid gap-3 xl:grid-cols-[340px_1fr_380px]">
       <div className="grid gap-3">
-        <PixelCard title="Crypto Bot" eyebrow={settings?.enabled ? "auto loop enabled" : "auto loop paused"}>
-          <div className="grid grid-cols-2 gap-2">
-            <PixelButton tone={settings?.enabled ? "good" : "neutral"} onClick={() => onUpdateSettings({ enabled: !settings?.enabled })} disabled={!settings}>
-              {settings?.enabled ? "Enabled" : "Enable"}
-            </PixelButton>
-            <PixelButton tone="magic" onClick={onCheckNow} disabled={!settings || isChecking}>
-              {isChecking ? "Checking" : "Check Now"}
-            </PixelButton>
+        <PixelCard title="Crypto Bot" eyebrow={autoRunOn ? "auto run mode on" : "auto run mode off"}>
+          <div className={cx("rounded-[8px] border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]", autoRunOn ? "border-emerald-300/80 bg-emerald-100/82" : "border-slate-200/80 bg-white/62")}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className={cx("font-pixel text-[10px] uppercase tracking-[0.14em]", autoRunOn ? "text-emerald-800" : "text-slate-500")}>
+                  {autoRunOn ? "Auto run active" : "Auto run paused"}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-700">
+                  {autoRunOn ? "Backend checks selected coins every 30 minutes." : "No automatic crypto checks will run."}
+                </p>
+              </div>
+              <StatusBadge value={autoRunOn ? "ON" : "OFF"} tone={autoRunOn ? "good" : "warn"} />
+            </div>
+            <button
+              className={cx(
+                "mt-3 min-h-14 w-full rounded-[8px] border px-4 text-sm font-black uppercase tracking-[0.08em] shadow-[0_14px_30px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60",
+                autoRunOn
+                  ? "border-emerald-400/80 bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "border-slate-950/15 bg-slate-950 text-white hover:bg-slate-800"
+              )}
+              onClick={() => onUpdateSettings({ enabled: !autoRunOn })}
+              disabled={!settings}
+            >
+              {autoRunOn ? "Auto Run Is On - Turn Off" : "Turn Auto Run On"}
+            </button>
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-600">
-            When enabled, the backend checks CoinGecko every 30 minutes and can place fake BUY/SELL trades automatically.
+            Auto run is fake-money only. A BUY/SELL only happens when CoinGecko price, OHLC candles, strategy signal, exposure, cash, cooldown, and daily limits all pass.
           </p>
+          <PixelButton tone="magic" className="mt-3 w-full" onClick={onCheckNow} disabled={!settings || isChecking}>
+            {isChecking ? "Checking CoinGecko" : "Run One Check Now"}
+          </PixelButton>
           <div className="mt-3 grid gap-2">
             <label className="grid gap-1 text-xs font-black uppercase">
               Max trades/day
@@ -722,6 +777,16 @@ function CryptoModePanel({
               - $10,000
             </PixelButton>
           </div>
+        </PixelCard>
+
+        <PixelCard title="Clear Demo Data" eyebrow="free database cleanup">
+          <p className="text-xs leading-5 text-slate-600">
+            Clears this browser demo account: AI analyses, crypto bot history/settings, watchlist, orders, fills, positions, and wallet account data.
+          </p>
+          <PixelButton tone="warn" className="mt-3 w-full" onClick={onClearData} disabled={isClearing}>
+            {isClearing ? "Clearing" : "Clear Backend Data"}
+          </PixelButton>
+          {clearNotice ? <p className="mt-3 rounded-[8px] border border-emerald-200/80 bg-emerald-100/80 p-2 text-xs font-semibold text-emerald-950">{clearNotice}</p> : null}
         </PixelCard>
       </div>
 

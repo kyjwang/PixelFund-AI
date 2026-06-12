@@ -102,6 +102,49 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
     return logs.map(normalizeLog);
   }
 
+  async clearDemoData(ownerKey?: string) {
+    const key = this.accountKey(ownerKey);
+    const account = await this.prisma.demoAccount.findUnique({ where: { ownerKey: key } });
+    const analysisRuns = await this.prisma.analysisRun.findMany({
+      where: { ownerKey: key },
+      select: { id: true }
+    });
+    const analysisRunIds = analysisRuns.map((run) => run.id);
+
+    return this.prisma.$transaction(async (tx) => {
+      const deletedAgentResults = analysisRunIds.length
+        ? await tx.agentResult.deleteMany({ where: { analysisRunId: { in: analysisRunIds } } })
+        : { count: 0 };
+      const deletedAnalysisRuns = await tx.analysisRun.deleteMany({ where: { ownerKey: key } });
+      const deletedCryptoLogs = await tx.cryptoTraderLog.deleteMany({ where: { ownerKey: key } });
+      const deletedCryptoSettings = await tx.cryptoTraderSettings.deleteMany({ where: { ownerKey: key } });
+      const deletedWatchlistItems = await tx.watchlistItem.deleteMany({ where: { ownerKey: key } });
+
+      let deletedTrades = { count: 0 };
+      let deletedOrders = { count: 0 };
+      let deletedPositions = { count: 0 };
+      let deletedAccounts = { count: 0 };
+      if (account) {
+        deletedTrades = await tx.trade.deleteMany({ where: { accountId: account.id } });
+        deletedOrders = await tx.order.deleteMany({ where: { accountId: account.id } });
+        deletedPositions = await tx.position.deleteMany({ where: { accountId: account.id } });
+        deletedAccounts = await tx.demoAccount.deleteMany({ where: { id: account.id } });
+      }
+
+      return {
+        deletedAnalysisRuns: deletedAnalysisRuns.count,
+        deletedAgentResults: deletedAgentResults.count,
+        deletedCryptoLogs: deletedCryptoLogs.count,
+        deletedCryptoSettings: deletedCryptoSettings.count,
+        deletedTrades: deletedTrades.count,
+        deletedOrders: deletedOrders.count,
+        deletedPositions: deletedPositions.count,
+        deletedWatchlistItems: deletedWatchlistItems.count,
+        deletedAccounts: deletedAccounts.count
+      };
+    });
+  }
+
   async checkNow(ownerKey?: string, now = new Date()) {
     const settings = await this.getSettings(ownerKey);
     const checkedAt = now.toISOString();
@@ -162,14 +205,22 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
     const candles = await this.cryptoCandles(symbol);
     const price = context?.priceUsd ?? candles.at(-1)?.close ?? 0;
     if (!asset || price <= 0 || candles.length === 0) {
+      const reason =
+        price <= 0
+          ? "HOLD because CoinGecko did not return a usable live crypto price."
+          : "HOLD because CoinGecko OHLC candles were unavailable; the bot needs candles for SMA, momentum, and volatility checks.";
+      const reasons =
+        price <= 0
+          ? ["CoinGecko simple price returned no usable USD value.", "No fake trade was placed because the bot cannot size a trade without price data."]
+          : ["CoinGecko simple price worked, but OHLC history returned no usable candles.", "No fake trade was placed because the strategy cannot calculate trend, momentum, or volatility without candles."];
       return this.saveLog({
         ownerKey: settings.ownerKey,
         swedenDay,
         symbol,
         action: "HOLD",
         score: 0,
-        reason: "HOLD because live CoinGecko crypto data was unavailable.",
-        reasons: ["CoinGecko returned no usable price or OHLC candles."],
+        reason,
+        reasons,
         price: price || null,
         quantity: null,
         notional: null,
@@ -230,7 +281,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async cryptoCandles(symbol: CryptoSymbol): Promise<CryptoCandle[]> {
-    const candles = await this.coinGecko.cryptoHistory(symbol, 1);
+    const candles = (await this.coinGecko.cryptoHistory(symbol, 1)) ?? (await this.coinGecko.cryptoHistory(symbol, 7));
     return (candles ?? []).map((candle) => ({
       timestamp: candle.date,
       open: candle.open,

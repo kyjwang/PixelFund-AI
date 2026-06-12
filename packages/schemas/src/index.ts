@@ -464,6 +464,18 @@ export const cryptoCashAdjustmentSchema = z.object({
   amount: z.union([z.literal(10000), z.literal(-10000)])
 });
 
+export const cryptoTraderClearDataResultSchema = z.object({
+  deletedAnalysisRuns: z.number().int().nonnegative(),
+  deletedAgentResults: z.number().int().nonnegative(),
+  deletedCryptoLogs: z.number().int().nonnegative(),
+  deletedCryptoSettings: z.number().int().nonnegative(),
+  deletedTrades: z.number().int().nonnegative(),
+  deletedOrders: z.number().int().nonnegative(),
+  deletedPositions: z.number().int().nonnegative(),
+  deletedWatchlistItems: z.number().int().nonnegative(),
+  deletedAccounts: z.number().int().nonnegative()
+});
+
 export const analysisRunSchema = z.object({
   id: z.string(),
   ticker: tickerSchema,
@@ -545,6 +557,7 @@ export type CryptoSymbol = z.infer<typeof cryptoSymbolSchema>;
 export type CryptoTraderSettings = z.infer<typeof cryptoTraderSettingsSchema>;
 export type CryptoTraderSettingsUpdate = z.infer<typeof cryptoTraderSettingsUpdateSchema>;
 export type CryptoTraderLog = z.infer<typeof cryptoTraderLogSchema>;
+export type CryptoTraderClearDataResult = z.infer<typeof cryptoTraderClearDataResultSchema>;
 export type AnalysisRun = z.infer<typeof analysisRunSchema>;
 export type AgentResult = z.infer<typeof agentResultSchema>;
 export type AnalysisExplanation = z.infer<typeof analysisExplanationSchema>;

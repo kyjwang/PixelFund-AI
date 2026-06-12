@@ -166,5 +166,5 @@ export interface MarketDataProvider {
   macroSeries?(ticker: string): Promise<MacroSeriesPoint[] | null>;
   socialSentiment?(ticker: string): Promise<NewsItem[] | null>;
   cryptoContext?(ticker: string): Promise<CryptoContext | null>;
-  cryptoHistory?(ticker: string, days?: 1 | 2): Promise<HistoricalCandle[] | null>;
+  cryptoHistory?(ticker: string, days?: 1 | 7): Promise<HistoricalCandle[] | null>;
 }
