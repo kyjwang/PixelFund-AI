@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import type { CryptoTraderSettings as PrismaCryptoTraderSettings } from "@prisma/client";
 import { applyTrade } from "@pixelfund/domain";
-import type { CryptoSymbol, CryptoTraderSettingsUpdate } from "@pixelfund/schemas";
+import type { CryptoStrategyMode, CryptoSymbol, CryptoTraderSettingsUpdate } from "@pixelfund/schemas";
 import { PrismaService } from "../common/prisma.service";
 import { DomainError } from "../common/errors/domain.error";
 import { PortfolioService } from "../portfolio/portfolio.service";
@@ -16,10 +16,13 @@ const cryptoCoinIds: Record<CryptoSymbol, string> = {
   ETH: "ethereum",
   SOL: "solana"
 };
-const checkIntervalMs = 30 * 60 * 1000;
+const balancedCheckIntervalMs = 30 * 60 * 1000;
+const aggressiveCheckIntervalMs = 5 * 60 * 1000;
+const aggressiveSessionMs = 60 * 60 * 1000;
 
-type NormalizedCryptoTraderSettings = Omit<PrismaCryptoTraderSettings, "selectedCoins"> & {
+type NormalizedCryptoTraderSettings = Omit<PrismaCryptoTraderSettings, "selectedCoins" | "strategyMode"> & {
   selectedCoins: CryptoSymbol[];
+  strategyMode: CryptoStrategyMode;
 };
 
 @Injectable()
@@ -34,7 +37,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.interval = setInterval(() => void this.runEnabledBots(), checkIntervalMs);
+    this.interval = setInterval(() => void this.runEnabledBots(), aggressiveCheckIntervalMs);
     this.interval.unref?.();
   }
 
@@ -46,10 +49,10 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
     return (ownerKey ?? "demo").trim().slice(0, 64) || "demo";
   }
 
-  async getSettings(ownerKey?: string) {
+  async getSettings(ownerKey?: string, now = new Date()) {
     const key = this.accountKey(ownerKey);
     const existing = await this.prisma.cryptoTraderSettings.findUnique({ where: { ownerKey: key } });
-    if (existing) return normalizeSettings(existing);
+    if (existing) return this.normalizeActiveSettings(existing, now);
     const created = await this.prisma.cryptoTraderSettings.create({
       data: {
         ownerKey: key,
@@ -63,12 +66,15 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
     return normalizeSettings(created);
   }
 
-  async updateSettings(input: CryptoTraderSettingsUpdate, ownerKey?: string) {
-    const current = await this.getSettings(ownerKey);
+  async updateSettings(input: CryptoTraderSettingsUpdate, ownerKey?: string, now = new Date()) {
+    const current = await this.getSettings(ownerKey, now);
     const selectedCoins = input.selectedCoins ? uniqueCoins(input.selectedCoins) : current.selectedCoins;
     if (selectedCoins.length < 1 || selectedCoins.length > 2) {
       throw new BadRequestException("Choose one or two crypto coins.");
     }
+    const nextStrategyMode = input.strategyMode ?? current.strategyMode;
+    const aggressiveStartedAt = input.strategyMode === "AGGRESSIVE" ? now : input.strategyMode === "BALANCED" ? null : current.aggressiveStartedAt;
+    const aggressiveExpiresAt = input.strategyMode === "AGGRESSIVE" ? new Date(now.getTime() + aggressiveSessionMs) : input.strategyMode === "BALANCED" ? null : current.aggressiveExpiresAt;
     const updated = await this.prisma.cryptoTraderSettings.update({
       where: { ownerKey: current.ownerKey },
       data: {
@@ -76,10 +82,13 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
         selectedCoins,
         maxTradesPerDay: input.maxTradesPerDay ?? current.maxTradesPerDay,
         stopLossPercent: input.stopLossPercent ?? current.stopLossPercent,
-        maxPortfolioPercent: input.maxPortfolioPercent ?? current.maxPortfolioPercent
+        maxPortfolioPercent: input.maxPortfolioPercent ?? current.maxPortfolioPercent,
+        strategyMode: nextStrategyMode,
+        aggressiveStartedAt,
+        aggressiveExpiresAt
       }
     });
-    return normalizeSettings(updated);
+    return this.normalizeActiveSettings(updated, now);
   }
 
   async adjustCash(amount: 10000 | -10000, ownerKey?: string) {
@@ -151,7 +160,8 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
   }
 
   async checkNow(ownerKey?: string, now = new Date()) {
-    const settings = await this.getSettings(ownerKey);
+    const aggressiveExpired = await this.isAggressiveExpired(ownerKey, now);
+    const settings = await this.getSettings(ownerKey, now);
     const checkedAt = now.toISOString();
     const swedenDay = swedenDayKey(now);
     const btcData = await this.marketData.resolve("BTC");
@@ -168,7 +178,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
             action: "HOLD",
             score: 0,
             reason: `Daily trade limit reached (${tradesToday}/${settings.maxTradesPerDay}).`,
-            reasons: ["The bot saved a HOLD decision instead of placing another trade."],
+            reasons: [...expiryReasons(aggressiveExpired), "The bot saved a HOLD decision instead of placing another trade."],
             price: null,
             quantity: null,
             notional: null,
@@ -178,7 +188,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
         continue;
       }
 
-      const decision = await this.evaluateCoin(settings, symbol, btcData, tradesToday, now, swedenDay);
+      const decision = await this.evaluateCoin(settings, symbol, btcData, tradesToday, now, swedenDay, aggressiveExpired);
       logs.push(decision);
       if (decision.tradeId) tradesToday += 1;
     }
@@ -199,12 +209,14 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
   private async runEnabledBots() {
     const settings = await this.prisma.cryptoTraderSettings.findMany({ where: { enabled: true } });
     for (const setting of settings) {
-      if (setting.lastCheckedAt && Date.now() - setting.lastCheckedAt.getTime() < checkIntervalMs - 5000) continue;
-      await this.checkNow(setting.ownerKey).catch(() => undefined);
+      const active = await this.normalizeActiveSettings(setting, new Date());
+      const intervalMs = active.strategyMode === "AGGRESSIVE" ? aggressiveCheckIntervalMs : balancedCheckIntervalMs;
+      if (active.lastCheckedAt && Date.now() - active.lastCheckedAt.getTime() < intervalMs - 5000) continue;
+      await this.checkNow(active.ownerKey).catch(() => undefined);
     }
   }
 
-  private async evaluateCoin(settings: NormalizedCryptoTraderSettings, symbol: CryptoSymbol, btcData: CryptoMarketDataBundle, tradesToday: number, now: Date, swedenDay: string) {
+  private async evaluateCoin(settings: NormalizedCryptoTraderSettings, symbol: CryptoSymbol, btcData: CryptoMarketDataBundle, tradesToday: number, now: Date, swedenDay: string, aggressiveExpired = false) {
     const data = symbol === "BTC" ? btcData : await this.marketData.resolve(symbol);
     const price = data.price;
     const candles = data.candles;
@@ -216,7 +228,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
         action: "HOLD",
         score: 0,
         reason: "HOLD because no crypto market data was available from CoinGecko or Yahoo/yfinance fallback.",
-        reasons: data.warnings.length ? data.warnings : ["No fake trade was placed because the bot could not get real public crypto price/candle data."],
+        reasons: [...expiryReasons(aggressiveExpired), ...(data.warnings.length ? data.warnings : ["No fake trade was placed because the bot could not get real public crypto price/candle data."])],
         price: price || null,
         quantity: null,
         notional: null,
@@ -245,7 +257,8 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
       tradesToday,
       maxTradesPerDay: settings.maxTradesPerDay,
       lastTradeAt: lastTrade?.createdAt ?? null,
-      now
+      now,
+      strategyMode: settings.strategyMode
     });
 
     let tradeId: string | null = null;
@@ -268,7 +281,7 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
       action: tradeId ? signal.action : "HOLD",
       score: signal.score,
       reason: reasonWithSource(tradeId ? signal.reason : signal.action === "HOLD" ? signal.reason : `${signal.action} signal skipped because risk or position rules blocked execution.`, data),
-      reasons: [...dataSourceReasons(data), ...(signal.reasons.length ? signal.reasons : [signal.reason])],
+      reasons: [...expiryReasons(aggressiveExpired), ...dataSourceReasons(data), ...(signal.reasons.length ? signal.reasons : [signal.reason])],
       price,
       quantity,
       notional,
@@ -362,12 +375,33 @@ export class CryptoTraderService implements OnModuleInit, OnModuleDestroy {
       }
     });
   }
+
+  private async normalizeActiveSettings(settings: PrismaCryptoTraderSettings, now: Date): Promise<NormalizedCryptoTraderSettings> {
+    if (settings.strategyMode === "AGGRESSIVE" && settings.aggressiveExpiresAt && settings.aggressiveExpiresAt.getTime() <= now.getTime()) {
+      const updated = await this.prisma.cryptoTraderSettings.update({
+        where: { ownerKey: settings.ownerKey },
+        data: {
+          strategyMode: "BALANCED",
+          aggressiveStartedAt: null,
+          aggressiveExpiresAt: null
+        }
+      });
+      return normalizeSettings(updated);
+    }
+    return normalizeSettings(settings);
+  }
+
+  private async isAggressiveExpired(ownerKey: string | undefined, now: Date) {
+    const settings = await this.prisma.cryptoTraderSettings.findUnique({ where: { ownerKey: this.accountKey(ownerKey) } });
+    return Boolean(settings?.strategyMode === "AGGRESSIVE" && settings.aggressiveExpiresAt && settings.aggressiveExpiresAt.getTime() <= now.getTime());
+  }
 }
 
 function normalizeSettings(settings: PrismaCryptoTraderSettings): NormalizedCryptoTraderSettings {
   return {
     ...settings,
-    selectedCoins: uniqueCoins(settings.selectedCoins)
+    selectedCoins: uniqueCoins(settings.selectedCoins),
+    strategyMode: settings.strategyMode === "AGGRESSIVE" ? "AGGRESSIVE" : "BALANCED"
   };
 }
 
@@ -390,6 +424,10 @@ function reasonWithSource(reason: string, data: CryptoMarketDataBundle) {
 
 function dataSourceReasons(data: CryptoMarketDataBundle) {
   return [`Data source: ${data.source}${data.isFallback ? " (fallback)" : ""}.`, ...data.warnings];
+}
+
+function expiryReasons(expired: boolean) {
+  return expired ? ["Aggressive mode expired; returned to Balanced."] : [];
 }
 
 function swedenDayKey(date: Date) {

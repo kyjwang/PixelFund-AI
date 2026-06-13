@@ -150,6 +150,9 @@ model CryptoTraderSettings {
   maxTradesPerDay     Int      @default(4)
   stopLossPercent     Float    @default(4)
   maxPortfolioPercent Float    @default(20)
+  strategyMode        String   @default("BALANCED")
+  aggressiveStartedAt DateTime?
+  aggressiveExpiresAt DateTime?
   lastCheckedAt       DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

@@ -7,6 +7,7 @@ export const dataQualityStatusSchema = z.enum(["LIVE", "PARTIAL", "DELAYED", "UN
 export const orderStatusSchema = z.enum(["PENDING", "FILLED", "PARTIALLY_FILLED", "CANCELED", "REJECTED", "EXPIRED"]);
 export const cryptoSymbolSchema = z.enum(["BTC", "ETH", "SOL"]);
 export const cryptoTraderActionSchema = z.enum(["BUY", "SELL", "HOLD"]);
+export const cryptoStrategyModeSchema = z.enum(["BALANCED", "AGGRESSIVE"]);
 export const agentTypeSchema = z.enum([
   "TECHNICAL_ANALYST",
   "NEWS_ANALYST",
@@ -420,9 +421,12 @@ export const cryptoTraderSettingsSchema = z.object({
   ownerKey: z.string(),
   enabled: z.boolean(),
   selectedCoins: z.array(cryptoSymbolSchema).min(1).max(2),
-  maxTradesPerDay: z.number().int().min(1).max(10),
+  maxTradesPerDay: z.number().int().min(1).max(30),
   stopLossPercent: z.number().min(1).max(25),
   maxPortfolioPercent: z.number().min(1).max(20),
+  strategyMode: cryptoStrategyModeSchema,
+  aggressiveStartedAt: z.coerce.string().nullable().optional(),
+  aggressiveExpiresAt: z.coerce.string().nullable().optional(),
   lastCheckedAt: z.coerce.string().nullable().optional(),
   createdAt: z.coerce.string(),
   updatedAt: z.coerce.string()
@@ -431,9 +435,10 @@ export const cryptoTraderSettingsSchema = z.object({
 export const cryptoTraderSettingsUpdateSchema = z.object({
   enabled: z.boolean().optional(),
   selectedCoins: z.array(cryptoSymbolSchema).min(1).max(2).optional(),
-  maxTradesPerDay: z.number().int().min(1).max(10).optional(),
+  maxTradesPerDay: z.number().int().min(1).max(30).optional(),
   stopLossPercent: z.number().min(1).max(25).optional(),
-  maxPortfolioPercent: z.number().min(1).max(20).optional()
+  maxPortfolioPercent: z.number().min(1).max(20).optional(),
+  strategyMode: cryptoStrategyModeSchema.optional()
 });
 
 export const cryptoTraderLogSchema = z.object({
@@ -554,6 +559,7 @@ export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
 export type OrderPreview = z.infer<typeof orderPreviewSchema>;
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 export type CryptoSymbol = z.infer<typeof cryptoSymbolSchema>;
+export type CryptoStrategyMode = z.infer<typeof cryptoStrategyModeSchema>;
 export type CryptoTraderSettings = z.infer<typeof cryptoTraderSettingsSchema>;
 export type CryptoTraderSettingsUpdate = z.infer<typeof cryptoTraderSettingsUpdateSchema>;
 export type CryptoTraderLog = z.infer<typeof cryptoTraderLogSchema>;

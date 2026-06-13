@@ -1,10 +1,15 @@
 import type { CryptoCandle, CryptoSignal, CryptoSignalInput } from "./crypto-trader.types";
 
 const minTradeNotional = 100;
-const cooldownMs = 60 * 60 * 1000;
+const minuteMs = 60 * 1000;
 
 export function evaluateCryptoSignal(input: CryptoSignalInput): CryptoSignal {
   const reasons: string[] = [];
+  const aggressive = input.strategyMode === "AGGRESSIVE";
+  const cooldownMinutes = aggressive ? 5 : 60;
+  const buyThreshold = aggressive ? 40 : 60;
+  const sellThreshold = aggressive ? -25 : -35;
+  const momentumThreshold = aggressive ? 0.002 : 0.006;
   const candles = sortCandles(input.candles);
   const closes = candles.map((candle) => candle.close).filter((close) => Number.isFinite(close) && close > 0);
   const btcCloses = sortCandles(input.btcCandles).map((candle) => candle.close).filter((close) => Number.isFinite(close) && close > 0);
@@ -13,12 +18,12 @@ export function evaluateCryptoSignal(input: CryptoSignalInput): CryptoSignal {
     return hold(0, `Daily trade limit reached (${input.tradesToday}/${input.maxTradesPerDay}).`, reasons);
   }
 
-  if (input.lastTradeAt && input.now.getTime() - input.lastTradeAt.getTime() < cooldownMs) {
-    return hold(0, "Cooldown active after the previous crypto trade.", reasons);
+  if (input.lastTradeAt && input.now.getTime() - input.lastTradeAt.getTime() < cooldownMinutes * minuteMs) {
+    return hold(0, `Cooldown active for ${cooldownMinutes} minutes after the previous crypto trade.`, reasons);
   }
 
   if (closes.length < 12) {
-    return hold(0, "Not enough CoinGecko candle data for a reliable signal.", reasons);
+    return hold(0, "Not enough crypto candle data for a reliable signal.", reasons);
   }
 
   if (input.heldQuantity > 0 && input.averageCost > 0) {
@@ -50,12 +55,12 @@ export function evaluateCryptoSignal(input: CryptoSignalInput): CryptoSignal {
     reasons.push("SMA trend is negative.");
   }
 
-  if (recentMomentum > 0.006) {
+  if (recentMomentum > momentumThreshold) {
     score += 20;
-    reasons.push("Recent momentum confirms upside.");
-  } else if (recentMomentum < -0.006) {
+    reasons.push(aggressive ? "Short-term momentum confirms upside." : "Recent momentum confirms upside.");
+  } else if (recentMomentum < -momentumThreshold) {
     score -= 20;
-    reasons.push("Recent momentum confirms downside.");
+    reasons.push(aggressive ? "Short-term momentum confirms downside." : "Recent momentum confirms downside.");
   } else {
     reasons.push("Momentum is not strong enough.");
   }
@@ -73,17 +78,17 @@ export function evaluateCryptoSignal(input: CryptoSignalInput): CryptoSignal {
     reasons.push("BTC regime filter is negative, so altcoin buys need stronger confirmation.");
   }
 
-  if (input.heldQuantity > 0 && score <= -35) {
+  if (input.heldQuantity > 0 && score <= sellThreshold) {
     return {
       action: "SELL",
       score,
       notional: input.heldQuantity * input.price,
-      reason: `SELL because technical score ${Math.round(score)} turned defensive.`,
+      reason: `${aggressive ? "Aggressive mode: " : ""}SELL because technical score ${Math.round(score)} turned defensive.`,
       reasons
     };
   }
 
-  if (score >= 60) {
+  if (score >= buyThreshold) {
     const allowedExposure = Math.max(0, input.maxPortfolioPercent - input.coinExposurePercent);
     const maxNotionalByExposure = input.portfolioValue * (allowedExposure / 100);
     const targetNotional = Math.min(input.cash, maxNotionalByExposure, input.portfolioValue * 0.1);
@@ -94,12 +99,12 @@ export function evaluateCryptoSignal(input: CryptoSignalInput): CryptoSignal {
       action: "BUY",
       score,
       notional: round(targetNotional),
-      reason: `BUY because SMA trend and momentum confirm the setup.`,
+      reason: aggressive ? "Aggressive mode: short-term momentum triggered BUY." : "BUY because SMA trend and momentum confirm the setup.",
       reasons
     };
   }
 
-  return hold(score, `HOLD because technical score ${Math.round(score)} is not actionable.`, reasons);
+  return hold(score, `HOLD because ${aggressive ? "short-term " : ""}technical score ${Math.round(score)} is not actionable.`, reasons);
 }
 
 function hold(score: number, reason: string, reasons: string[]): CryptoSignal {

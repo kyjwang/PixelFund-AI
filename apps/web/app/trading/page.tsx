@@ -701,6 +701,15 @@ function CryptoModePanel({
   const selected = settings?.selectedCoins ?? ["BTC"];
   const cryptoPositions = (portfolio?.positions ?? []).filter((position) => ["BTC", "ETH", "SOL"].includes(position.ticker));
   const autoRunOn = Boolean(settings?.enabled);
+  const [clock, setClock] = useState(() => Date.now());
+  const aggressiveExpiresAt = settings?.aggressiveExpiresAt ? new Date(settings.aggressiveExpiresAt).getTime() : 0;
+  const aggressiveOn = settings?.strategyMode === "AGGRESSIVE" && aggressiveExpiresAt > clock;
+  const aggressiveRemainingMs = Math.max(0, aggressiveExpiresAt - clock);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setClock(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   function toggleCoin(symbol: "BTC" | "ETH" | "SOL") {
     const has = selected.includes(symbol);
@@ -720,7 +729,7 @@ function CryptoModePanel({
                   {autoRunOn ? "Auto run active" : "Auto run paused"}
                 </p>
                 <p className="mt-1 text-xs font-semibold text-slate-700">
-                  {autoRunOn ? "Backend checks selected coins every 30 minutes." : "No automatic crypto checks will run."}
+                  {autoRunOn ? aggressiveOn ? "Aggressive mode checks selected coins every 5 minutes." : "Backend checks selected coins every 30 minutes." : "No automatic crypto checks will run."}
                 </p>
               </div>
               <StatusBadge value={autoRunOn ? "ON" : "OFF"} tone={autoRunOn ? "good" : "warn"} />
@@ -739,16 +748,37 @@ function CryptoModePanel({
             </button>
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-600">
-            Auto run is fake-money only. A BUY/SELL only happens when CoinGecko price, OHLC candles, strategy signal, exposure, cash, cooldown, and daily limits all pass.
+            Auto run is fake-money only. A BUY/SELL only happens when real crypto data, strategy signal, exposure, cash, cooldown, and daily limits all pass.
           </p>
           <PixelButton tone="magic" className="mt-3 w-full" onClick={onCheckNow} disabled={!settings || isChecking}>
-            {isChecking ? "Checking CoinGecko" : "Run One Check Now"}
+            {isChecking ? "Checking Crypto Data" : "Run One Check Now"}
           </PixelButton>
+          <div className={cx("mt-3 rounded-[8px] border p-3", aggressiveOn ? "border-red-200/80 bg-red-100/78" : "border-white/65 bg-white/58")}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className={cx("font-pixel text-[10px] uppercase tracking-[0.14em]", aggressiveOn ? "text-red-800" : "text-slate-600")}>
+                  {aggressiveOn ? "Aggressive active" : "Balanced strategy"}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-700">
+                  {aggressiveOn ? `Aggressive ends in ${formatCountdown(aggressiveRemainingMs)}. Cooldown is 5 minutes.` : "Balanced uses safer thresholds and a 60 minute cooldown."}
+                </p>
+              </div>
+              <StatusBadge value={aggressiveOn ? "1H MODE" : "BALANCED"} tone={aggressiveOn ? "bad" : "neutral"} />
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <PixelButton tone={aggressiveOn ? "neutral" : "bad"} onClick={() => onUpdateSettings({ strategyMode: "AGGRESSIVE" })} disabled={!settings}>
+                Start 1-Hour Aggressive Mode
+              </PixelButton>
+              <PixelButton tone="neutral" onClick={() => onUpdateSettings({ strategyMode: "BALANCED" })} disabled={!settings || !aggressiveOn}>
+                Back to Balanced
+              </PixelButton>
+            </div>
+          </div>
           <div className="mt-3 grid gap-2">
             <label className="grid gap-1 text-xs font-black uppercase">
               Max trades/day
               <select value={settings?.maxTradesPerDay ?? 4} onChange={(event) => onUpdateSettings({ maxTradesPerDay: Number(event.target.value) })} className={compactInputClass} disabled={!settings}>
-                {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
+                {Array.from({ length: 30 }, (_, index) => index + 1).map((value) => (
                   <option key={value} value={value}>{value}</option>
                 ))}
               </select>
@@ -978,6 +1008,15 @@ function formatAge(ms: number) {
   if (!Number.isFinite(ms) || ms < 0) return "unknown";
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
   return `${Math.round(ms / 60_000)}m`;
+}
+
+function formatCountdown(ms: number) {
+  if (!Number.isFinite(ms) || ms <= 0) return "0m";
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
 }
 
 function recommendationPill(value: string) {

@@ -1,5 +1,6 @@
 export type CryptoSymbol = "BTC" | "ETH" | "SOL";
 export type CryptoSignalAction = "BUY" | "SELL" | "HOLD";
+export type CryptoStrategyMode = "BALANCED" | "AGGRESSIVE";
 
 export type CryptoCandle = {
   timestamp: string;
@@ -26,6 +27,7 @@ export type CryptoSignalInput = {
   maxTradesPerDay: number;
   lastTradeAt: Date | null;
   now: Date;
+  strategyMode: CryptoStrategyMode;
 };
 
 export type CryptoSignal = {
