@@ -318,22 +318,22 @@ const officeWorkflowOrder = [
 ];
 
 const desktopAgentPositions: Record<string, { x: string; y: string }> = {
-  PORTFOLIO_MANAGER: { x: "73%", y: "16%" },
-  TEAM_LEAD: { x: "88%", y: "16%" },
-  TECHNICAL_ANALYST: { x: "9%", y: "34%" },
-  FUNDAMENTALS_ANALYST: { x: "22%", y: "34%" },
-  NEWS_ANALYST: { x: "35%", y: "34%" },
-  MACRO_ANALYST: { x: "48%", y: "34%" },
-  SENTIMENT_ANALYST: { x: "61%", y: "34%" },
-  QUANT_ANALYST: { x: "74%", y: "34%" },
-  CRYPTO_SPECIALIST: { x: "87%", y: "34%" },
-  BULL_RESEARCHER: { x: "39%", y: "54%" },
-  BEAR_RESEARCHER: { x: "54%", y: "54%" },
-  TRADER_AGENT: { x: "22%", y: "75%" },
-  RISK_ANALYST: { x: "43%", y: "75%" },
-  AGGRESSIVE_RISK: { x: "57%", y: "75%" },
-  NEUTRAL_RISK: { x: "71%", y: "75%" },
-  CONSERVATIVE_RISK: { x: "85%", y: "75%" }
+  PORTFOLIO_MANAGER: { x: "72%", y: "18%" },
+  TEAM_LEAD: { x: "87%", y: "18%" },
+  TECHNICAL_ANALYST: { x: "9%", y: "38%" },
+  FUNDAMENTALS_ANALYST: { x: "22%", y: "38%" },
+  NEWS_ANALYST: { x: "35%", y: "38%" },
+  MACRO_ANALYST: { x: "48%", y: "38%" },
+  SENTIMENT_ANALYST: { x: "61%", y: "38%" },
+  QUANT_ANALYST: { x: "74%", y: "38%" },
+  CRYPTO_SPECIALIST: { x: "87%", y: "38%" },
+  BULL_RESEARCHER: { x: "39%", y: "58%" },
+  BEAR_RESEARCHER: { x: "55%", y: "58%" },
+  TRADER_AGENT: { x: "21%", y: "78%" },
+  RISK_ANALYST: { x: "42%", y: "78%" },
+  AGGRESSIVE_RISK: { x: "56%", y: "78%" },
+  NEUTRAL_RISK: { x: "70%", y: "78%" },
+  CONSERVATIVE_RISK: { x: "84%", y: "78%" }
 };
 
 const mobileOfficeStages = [
@@ -451,15 +451,23 @@ function MobileOfficeBoard({
 }) {
   return (
     <div className="glass-panel pixel-card w-full rounded-[8px] p-3 md:hidden">
-      <div className="glass-chip rounded-[8px] p-2">
-        <p className="font-pixel text-[10px] text-slate-900">{selected.name}</p>
-        <p className="mt-1 text-[10px] font-black uppercase text-[color:var(--pf-accent)]">{selected.role} / {selectedStatus}</p>
+      <div className="glass-chip rounded-[8px] p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-pixel text-[10px] text-slate-900">{selected.name}</p>
+            <p className="mt-1 text-[10px] font-black uppercase text-[color:var(--pf-accent)]">{selected.role}</p>
+          </div>
+          <span className="shrink-0 rounded-full border border-white/70 bg-white/70 px-2 py-1 text-[9px] font-black uppercase text-slate-700">
+            {selectedStatus}
+          </span>
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-slate-600">Tap any tile to inspect its specialist view below the office.</p>
       </div>
       <div className="mt-3 grid gap-3">
         {mobileOfficeStages.map((stage) => (
           <section key={stage.title} aria-label={`${stage.title} agents`}>
             <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-slate-600">{stage.title}</p>
-            <div className={`grid gap-2 ${stage.agentIds.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+            <div className={`grid gap-2 ${stage.agentIds.length === 1 ? "grid-cols-1" : "grid-cols-1 min-[420px]:grid-cols-2"}`}>
               {stage.agentIds.map((agentId) => {
                 const agent = gameAgents.find((item) => item.id === agentId) ?? gameAgents[0];
                 const runtime = agentRuntimeState(agent, agentStatuses, agentRecommendations);
@@ -502,7 +510,7 @@ function MobileAgentTile({
     <button
       type="button"
       onClick={onSelect}
-      className={`min-h-[74px] rounded-[8px] border p-2 text-left shadow-[0_10px_22px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.7)] ${active ? "ring-2 ring-[color:var(--pf-accent)]" : ""} ${stateClass(state, active)}`}
+      className={`min-h-[78px] rounded-[8px] border p-2 text-left shadow-[0_10px_22px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:-translate-y-0.5 ${active ? "ring-2 ring-[color:var(--pf-accent)]" : ""} ${stateClass(state, active)}`}
       title={`${agent.role} (${status})`}
       aria-label={agent.role}
     >
@@ -511,7 +519,7 @@ function MobileAgentTile({
           {agent.label}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-[11px] font-black uppercase leading-4 text-slate-950">{agent.role}</span>
+          <span className="block text-[11px] font-black uppercase leading-4 text-slate-950">{agent.role}</span>
           <span className="mt-0.5 block truncate font-pixel text-[8px] uppercase text-slate-600">{status}</span>
         </span>
       </div>
@@ -551,7 +559,7 @@ export function PixelOffice({
         agentStatuses={agentStatuses}
         agentRecommendations={agentRecommendations}
       />
-    <div className="glass-panel pixel-card relative hidden h-[640px] w-full overflow-hidden rounded-[8px] md:block lg:h-[660px]">
+      <div className="glass-panel pixel-card relative hidden h-[620px] w-full overflow-hidden rounded-[8px] md:block lg:h-[650px] xl:h-[670px]">
       <div className="absolute inset-x-0 top-0 h-28 bg-sky-200/36" />
       <div className="absolute inset-x-0 top-28 h-24 bg-amber-200/24" />
       <div className="absolute left-0 top-0 h-full w-20 bg-gradient-to-r from-white/32 to-transparent" />
@@ -577,30 +585,30 @@ export function PixelOffice({
       <div className="absolute bottom-44 left-0 right-0 h-5 bg-slate-700/75" />
       <div className="absolute bottom-12 left-[8%] h-10 w-[84%] rounded-[8px] border border-slate-950/10 bg-[#4b372f] shadow-[0_18px_42px_rgba(15,23,42,0.22)]" />
 
-      <div className="glass-chip absolute left-[4%] top-[22%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">evidence desks</div>
-      <div className="glass-chip absolute left-[32%] top-[45%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">bull vs bear</div>
-      <div className="glass-chip absolute left-[9%] top-[63%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">execution + risk</div>
-      <div className="glass-chip absolute right-[4%] top-[5%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">manager desk</div>
+      <div className="glass-chip absolute left-[4%] top-[24%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">evidence desks</div>
+      <div className="glass-chip absolute left-[32%] top-[47%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">bull vs bear</div>
+      <div className="glass-chip absolute left-[9%] top-[66%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">execution + risk</div>
+      <div className="glass-chip absolute right-[4%] top-[6%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">manager desk</div>
 
-      <div className="absolute left-[4%] top-[19%] h-16 w-[90%] rounded-[8px] border border-white/55 bg-white/46 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
-      <div className="absolute left-[8%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#dbeafe]" />
-      <div className="absolute left-[22%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#fef3c7]" />
-      <div className="absolute left-[36%] top-[21%] h-7 w-[12%] border-2 border-black bg-white" />
-      <div className="absolute left-[50%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#bae6fd]" />
-      <div className="absolute left-[64%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#fbcfe8]" />
-      <div className="absolute left-[78%] top-[21%] h-7 w-[12%] border-2 border-black bg-[#052e16] shadow-[inset_0_0_0_4px_#22c55e]" />
+      <div className="absolute left-[4%] top-[21%] h-16 w-[90%] rounded-[8px] border border-white/55 bg-white/46 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
+      <div className="absolute left-[8%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#dbeafe]" />
+      <div className="absolute left-[22%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#fef3c7]" />
+      <div className="absolute left-[36%] top-[23%] h-7 w-[12%] border-2 border-black bg-white" />
+      <div className="absolute left-[50%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#bae6fd]" />
+      <div className="absolute left-[64%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#fbcfe8]" />
+      <div className="absolute left-[78%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#052e16] shadow-[inset_0_0_0_4px_#22c55e]" />
 
-      <div className="absolute left-[30%] top-[42%] h-16 w-[24%] rounded-[8px] border border-slate-950/20 bg-[#0f172a] shadow-[0_16px_36px_rgba(15,23,42,0.16)]" />
-      <div className="absolute left-[36%] top-[43%] h-2 w-[4%] bg-[#22c55e]" />
-      <div className="absolute left-[42%] top-[46%] h-2 w-[4%] bg-[#ef4444]" />
-      <div className="absolute left-[46%] top-[43%] h-2 w-[4%] bg-[#facc15]" />
+      <div className="absolute left-[30%] top-[45%] h-16 w-[26%] rounded-[8px] border border-slate-950/20 bg-[#0f172a] shadow-[0_16px_36px_rgba(15,23,42,0.16)]" />
+      <div className="absolute left-[36%] top-[46%] h-2 w-[4%] bg-[#22c55e]" />
+      <div className="absolute left-[42%] top-[49%] h-2 w-[4%] bg-[#ef4444]" />
+      <div className="absolute left-[47%] top-[46%] h-2 w-[4%] bg-[#facc15]" />
 
-      <div className="absolute left-[10%] top-[63%] h-16 w-[78%] rounded-[8px] border border-white/55 bg-white/46 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
-      <div className="absolute left-[15%] top-[64%] h-8 w-10 border-2 border-black bg-[#fef3c7] shadow-[inset_0_-6px_0_#14b8a6]" />
-      <div className="absolute left-[41%] top-[64%] h-8 w-10 border-2 border-black bg-[#fed7aa]" />
-      <div className="absolute left-[55%] top-[64%] h-8 w-10 border-2 border-black bg-[#fecaca]" />
-      <div className="absolute left-[69%] top-[64%] h-8 w-10 border-2 border-black bg-[#e2e8f0]" />
-      <div className="absolute left-[82%] top-[64%] h-8 w-10 border-2 border-black bg-[#fef08a]" />
+      <div className="absolute left-[10%] top-[66%] h-16 w-[78%] rounded-[8px] border border-white/55 bg-white/46 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
+      <div className="absolute left-[15%] top-[67%] h-8 w-10 border-2 border-black bg-[#fef3c7] shadow-[inset_0_-6px_0_#14b8a6]" />
+      <div className="absolute left-[41%] top-[67%] h-8 w-10 border-2 border-black bg-[#fed7aa]" />
+      <div className="absolute left-[55%] top-[67%] h-8 w-10 border-2 border-black bg-[#fecaca]" />
+      <div className="absolute left-[69%] top-[67%] h-8 w-10 border-2 border-black bg-[#e2e8f0]" />
+      <div className="absolute left-[82%] top-[67%] h-8 w-10 border-2 border-black bg-[#fef08a]" />
 
       <div className="absolute right-[6%] bottom-[13%] h-20 w-[24%] rounded-[8px] border border-white/55 bg-white/48 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
       <div className="absolute right-[10%] bottom-[22%] h-8 w-[15%] border-2 border-black bg-white shadow-[inset_0_-6px_0_#cbd5e1]" />

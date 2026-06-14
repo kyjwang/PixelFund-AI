@@ -257,13 +257,13 @@ export function MissionPanel({
   askedTeam: boolean;
 }) {
   const missions = [
-    { label: "Analyze 3 stocks today", done: Math.min(analyzedCount, 3), total: 3 },
-    { label: "Build a 5 ticker watchlist", done: Math.min(watchlistCount, 5), total: 5 },
-    { label: "Ask the AI team", done: askedTeam ? 1 : 0, total: 1 }
+    { label: "Completed AI analyses", done: Math.min(analyzedCount, 3), total: 3, help: "Archive depth for recent research" },
+    { label: "Tracked symbols", done: Math.min(watchlistCount, 5), total: 5, help: "Market ideas followed by the desk" },
+    { label: "Team request", done: askedTeam ? 1 : 0, total: 1, help: askedTeam ? "AI office has been convened" : "Ask the team to begin a live run" }
   ];
 
   return (
-    <PixelCard title="Daily Missions" eyebrow="quest log">
+    <PixelCard title="Office Readiness" eyebrow="desk status">
       <div className="grid gap-2">
         {missions.map((mission) => (
           <div key={mission.label} className="glass-chip rounded-[8px] p-2.5 text-xs">
@@ -271,6 +271,7 @@ export function MissionPanel({
               <p className="font-bold">{mission.label}</p>
               <p className="font-pixel text-[10px]">{mission.done}/{mission.total}</p>
             </div>
+            <p className="mt-1 text-[10px] leading-4 text-slate-500">{mission.help}</p>
             <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-950/10">
               <div className="h-full rounded-full bg-[linear-gradient(90deg,#0f8f78,#2f6df6)]" style={{ width: `${(mission.done / mission.total) * 100}%` }} />
             </div>
@@ -304,8 +305,8 @@ export function StockSearchPanel({
   const progressTone = analysisProgress?.failed ? "text-red-700" : analysisProgress?.isActive ? "text-[color:var(--pf-accent)]" : "text-slate-600";
 
   return (
-    <PixelCard title="Stock Scanner" eyebrow="mission control">
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+    <PixelCard title="Stock Scanner" eyebrow="analysis control">
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
         <div className="relative">
           <label className="mb-1 block text-xs font-black uppercase text-slate-700" htmlFor="ticker-input">
             Ticker
@@ -333,7 +334,7 @@ export function StockSearchPanel({
             </div>
           ) : null}
         </div>
-        <PixelButton tone="magic" glow className="self-end" onClick={onAnalyze} disabled={isAnalyzing || analyzeDisabled}>
+        <PixelButton tone="magic" glow className="w-full self-end sm:w-auto sm:min-w-[156px]" onClick={onAnalyze} disabled={isAnalyzing || analyzeDisabled}>
           {isAnalyzing && analysisProgress ? `Analyzing ${analysisProgress.percent}%` : isAnalyzing ? "Analyzing..." : ticker.trim() ? "Ask AI Team" : "Choose Symbol"}
         </PixelButton>
       </div>
@@ -365,7 +366,7 @@ export function StockSearchPanel({
         </div>
       ) : null}
       <p className="mt-3 text-xs leading-5 text-slate-600">
-        Start with any ticker you want to research. No market price, chart, or recommendation is loaded until a symbol is selected.
+        Search a symbol, ask the AI team, then watch the office move from raw evidence to final manager decision.
       </p>
     </PixelCard>
   );
@@ -398,7 +399,7 @@ export function TeamDecisionPanel({
         {caveats.slice(0, 3).map((caveat) => (
           <p key={caveat} className="rounded-[8px] border border-amber-200/80 bg-amber-100/78 px-2 py-1 text-amber-950">{caveat}</p>
         ))}
-        <div className="grid max-h-72 gap-2 overflow-auto pr-1 sm:grid-cols-2">
+        <div className="grid max-h-80 gap-2 overflow-auto pr-1 sm:grid-cols-2">
           {children}
         </div>
       </div>

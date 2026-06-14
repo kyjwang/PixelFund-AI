@@ -421,26 +421,39 @@ export default function HomePage() {
       <AchievementToast show={Boolean(achievement)} title={achievement?.title ?? ""} detail={achievement?.detail ?? ""} />
       <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-3 pb-28 pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-5">
         <header className="grid gap-4">
-          <PixelCard>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
+          <PixelCard className="p-4 sm:p-5">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-semibold leading-8 tracking-normal md:text-4xl">AI Office</h1>
-                  <span className={badgeClass(finalRec)} aria-label={`Final recommendation ${finalRec}`}>
-                    Final Rec: {finalRec}
+                  <p className="rounded-full border border-emerald-200/80 bg-emerald-100/78 px-2.5 py-1 text-[10px] font-black uppercase text-emerald-950">
+                    Live desk
+                  </p>
+                  <span className={cx("rounded-full border px-2.5 py-1 text-[10px] font-black uppercase", socketConnected ? "border-emerald-200/80 bg-emerald-100/80 text-emerald-950" : "border-red-200/80 bg-red-100/80 text-red-950")}>
+                    {socketConnected ? "Socket live" : "Reconnecting"}
                   </span>
-                  <span className={cx("rounded-full border px-2.5 py-1 text-xs font-semibold", socketConnected ? "border-emerald-200/80 bg-emerald-100/80 text-emerald-950" : "border-red-200/80 bg-red-100/80 text-red-950")}>
-                    {socketConnected ? "Live socket" : "Reconnecting"}
+                  <span className={badgeClass(finalRec)} aria-label={`Final recommendation ${finalRec}`}>
+                    Decision {finalRec}
                   </span>
                 </div>
-                <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-700">{APP_DISCLAIMER}</p>
+                <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-normal md:text-5xl">AI Office</h1>
+                <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-700">
+                  Run a ticker through the specialist floor, inspect every agent opinion, then carry the manager decision into simulated trading.
+                </p>
+                <p className="mt-2 max-w-4xl text-xs leading-5 text-slate-600">{APP_DISCLAIMER}</p>
               </div>
-              <Link
-                href={selectedTicker ? `/trading?ticker=${encodeURIComponent(selectedTicker)}` : "/trading"}
-                className="pixel-button rounded-full border border-emerald-300/60 bg-[linear-gradient(135deg,#0f8f78,#2f6df6)] px-3.5 py-2 text-center text-xs font-black uppercase text-white shadow-[0_14px_32px_rgba(15,143,120,0.18)] transition hover:-translate-y-0.5"
-              >
-                Open Trading
-              </Link>
+              <div className="grid gap-2 sm:grid-cols-2 xl:w-[330px] xl:grid-cols-1">
+                <div className="glass-chip rounded-[8px] p-3">
+                  <p className="text-[10px] font-black uppercase text-slate-500">Current focus</p>
+                  <p className="mt-1 font-pixel text-sm text-slate-950">{selectedTicker || "NO SYMBOL"}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-600">{hasTicker ? selectedGameAgent.role : "Choose a ticker to open the office floor."}</p>
+                </div>
+                <Link
+                  href={selectedTicker ? `/trading?ticker=${encodeURIComponent(selectedTicker)}` : "/trading"}
+                  className="pixel-button grid min-h-12 place-items-center rounded-full border border-emerald-300/60 bg-[linear-gradient(135deg,#0f8f78,#2f6df6)] px-5 py-3 text-center text-xs font-black uppercase text-white shadow-[0_14px_32px_rgba(15,143,120,0.18)] transition hover:-translate-y-0.5"
+                >
+                  Open Trading
+                </Link>
+              </div>
             </div>
             <div className="mt-4">
               <PortfolioHud
@@ -456,7 +469,7 @@ export default function HomePage() {
             </div>
           </PixelCard>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
             <StockSearchPanel
               ticker={ticker}
               results={searchResults}
@@ -475,7 +488,7 @@ export default function HomePage() {
           <p className="glass-panel rounded-[8px] border-red-200/80 bg-red-100/80 p-3 text-sm text-red-950">{error}</p>
         ) : null}
 
-        <section className="grid gap-4 lg:grid-cols-[1.45fr_0.85fr]" aria-label="AI office floor">
+        <section className="grid items-start gap-4 lg:grid-cols-[1.45fr_0.85fr]" aria-label="AI office floor">
           <div className="grid gap-4">
             <PixelOffice
               onSelect={(agentId) => setSelectedAgent(agentId)}
@@ -647,7 +660,7 @@ function AgentIntroduction({
   confidence: number;
 }) {
   return (
-    <PixelCard title="Agent Introduction" eyebrow={agent.role}>
+    <PixelCard title="Selected Agent" eyebrow={agent.role}>
       <div className="grid gap-3 sm:grid-cols-[96px_1fr]">
         <div className="pixel-portrait glass-chip mx-auto h-28 w-24 rounded-[8px]" aria-hidden="true">
           <span />
@@ -693,7 +706,7 @@ function AnalysisOutput({
 }) {
   return (
     <PixelCard
-      title="Analysis Output"
+      title="Agent Output"
       eyebrow={`${ticker} / ${role}`}
     >
       <div className="flex flex-wrap gap-2">
@@ -701,7 +714,7 @@ function AnalysisOutput({
         {recommendation ? <StatusBadge value={recommendation.toLowerCase()} /> : null}
         {typeof confidence === "number" ? <StatusBadge value={`${Math.round(confidence * 100)}% confidence`} /> : null}
       </div>
-      <p className="mt-3 min-h-28 rounded-[8px] border border-white/60 bg-white/54 p-3 text-sm leading-6 text-slate-900">
+      <p className="mt-3 min-h-28 break-words rounded-[8px] border border-white/60 bg-white/54 p-3 text-sm leading-6 text-slate-900">
         {text}
       </p>
       <div className="mt-3 grid gap-2">
