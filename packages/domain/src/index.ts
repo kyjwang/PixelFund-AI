@@ -1008,6 +1008,19 @@ function cryptoSpecialistAnalysis(ticker: string, context: MarketContext): Agent
 
   const symbol = ticker.toUpperCase();
   const cryptoAdjacent = ["COIN", "MSTR", "MARA", "RIOT", "HOOD", "SQ", "PYPL", "TSLA"].includes(symbol);
+  if (!context.sourceAudit?.crypto.used && !context.cryptoContext && !cryptoAdjacent) {
+    return {
+      score: 50,
+      confidence: 0.35,
+      recommendation: "HOLD",
+      summary: `Crypto Specialist holds ${symbol}; this is not the right expert for a normal stock without crypto exposure.`,
+      reasons: [
+        `[scope] ${symbol} is not a crypto asset or crypto-adjacent ticker, so this is not my expertise.`,
+        "[scope] No crypto-specific analysis was applied; stock analysts and risk agents should drive the decision."
+      ]
+    };
+  }
+
   if (context.sourceAudit?.crypto.used && context.cryptoContext) {
     const cryptoMove = clamp(context.cryptoContext.change24hPercent, -12, 12);
     score += cryptoMove > 0 ? Math.min(cryptoMove / 2, 5) : Math.max(cryptoMove / 2, -7);
@@ -1196,6 +1209,20 @@ function finishAgent(
   const conviction = Math.abs(score - 50) / 50;
   const confidence = round(clamp(0.35 + dataQuality * 0.22 + evidenceCoverage * 0.22 + conviction * 0.21, 0.35, 0.92), 2);
   const reasons = inputReasons.length > 0 ? inputReasons.slice(0, 5) : ["Insufficient data; conservative fallback used."];
+
+  if (evidenceCount < 1 || dataQuality < 0.35) {
+    return {
+      score: 50,
+      confidence: round(clamp(0.32 + dataQuality * 0.18 + evidenceCoverage * 0.12, 0.32, 0.5), 2),
+      recommendation: "HOLD",
+      summary: `${agentName} keeps ${ticker.toUpperCase()} at HOLD/ongoing because it could not complete full research from ${evidenceLabel}.`,
+      reasons: [
+        `${agentName} could not complete full research, so no directional call was made.`,
+        ...reasons,
+        "HOLD/ongoing is used until stronger evidence is available."
+      ].slice(0, 6)
+    };
+  }
 
   if (dataQuality < 0.75) {
     reasons.push("Data coverage is incomplete, so confidence is intentionally capped.");

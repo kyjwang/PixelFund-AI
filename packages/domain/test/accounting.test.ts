@@ -233,6 +233,37 @@ describe("agent analysis engine", () => {
     expect(output.reasons.some((reason) => reason.includes("labeled social sentiment"))).toBe(true);
   });
 
+  test("crypto specialist opts out for ordinary non-crypto stocks", () => {
+    const context = makeContext({});
+
+    const output = buildAgentAnalysis("CRYPTO_SPECIALIST", "AAPL", context);
+
+    expect(output.recommendation).toBe("HOLD");
+    expect(output.summary).toContain("not the right expert");
+    expect(output.reasons.some((reason) => reason.includes("not my expertise"))).toBe(true);
+  });
+
+  test("agents hold ongoing when they cannot complete enough research", () => {
+    const context = makeContext({});
+    context.news = [];
+    context.analystTrend = null;
+    context.dataQuality = {
+      ...context.dataQuality,
+      score: 0.3,
+      status: "UNSUPPORTED",
+      news: false,
+      analystTrend: false,
+      warnings: ["No news provider coverage."],
+      messages: ["Research is incomplete."]
+    };
+
+    const output = buildAgentAnalysis("NEWS_ANALYST", "SIVE.ST", context);
+
+    expect(output.recommendation).toBe("HOLD");
+    expect(output.summary).toContain("ongoing");
+    expect(output.reasons.some((reason) => reason.includes("could not complete full research"))).toBe(true);
+  });
+
   test("bull and bear researchers use specialist evidence", () => {
     const context = makeContext({});
     const evidence = [
