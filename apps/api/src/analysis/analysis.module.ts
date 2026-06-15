@@ -7,9 +7,10 @@ import { AnalysisProcessor } from "./analysis.processor";
 import { AiService } from "../ai/ai.service";
 import { MarketModule } from "../market/market.module";
 import { WsModule } from "../ws/ws.module";
+import { MlModule } from "../ml/ml.module";
 
 @Module({
-  imports: [BullModule.registerQueue({ name: "analysis" }), MarketModule, WsModule],
+  imports: [BullModule.registerQueue({ name: "analysis" }), MarketModule, WsModule, MlModule],
   controllers: [AnalysisController],
   providers: [AnalysisService, PrismaService, AnalysisProcessor, AiService],
   exports: [AnalysisService]

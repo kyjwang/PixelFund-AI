@@ -1,0 +1,10 @@
+{
+  "name": "@pixelfund/ml",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "uvicorn pixelfund_ml.app:app --host 0.0.0.0 --port 4100 --reload",
+    "test": "PYTHONPATH=. python3 -m unittest discover tests",
+    "typecheck": "python3 -m py_compile pixelfund_ml/*.py"
+  }
+}

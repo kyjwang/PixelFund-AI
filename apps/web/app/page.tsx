@@ -435,7 +435,7 @@ export default function HomePage() {
                     Decision {finalRec}
                   </span>
                 </div>
-                <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-normal md:text-5xl">AI Office</h1>
+                <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-normal md:text-5xl">PixelFund AI Office</h1>
                 <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-700">
                   Run a ticker through the specialist floor, inspect every agent opinion, then carry the manager decision into simulated trading.
                 </p>

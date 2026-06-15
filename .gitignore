@@ -9,3 +9,7 @@ test-results
 .env.*
 !.env.example
 client/node_modules
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mlruns/

@@ -53,7 +53,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="grid h-8 w-8 place-items-center rounded-[7px] border border-slate-950/10 bg-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
               <span className="h-3.5 w-3.5 bg-[color:var(--pf-accent)] shadow-[6px_0_0_#2f6df6,0_6px_0_#f2c14e,6px_6px_0_#07111f]" />
             </span>
-            <span className="font-pixel text-xs leading-6">PixelFund</span>
+            <span className="font-pixel text-xs leading-6">PixelFund AI</span>
           </Link>
 
           <nav className="order-3 flex w-full min-w-0 items-center gap-1 overflow-x-auto px-1 lg:order-none lg:flex-1 lg:justify-center" aria-label="Game rooms">

@@ -318,22 +318,22 @@ const officeWorkflowOrder = [
 ];
 
 const desktopAgentPositions: Record<string, { x: string; y: string }> = {
-  PORTFOLIO_MANAGER: { x: "72%", y: "18%" },
-  TEAM_LEAD: { x: "87%", y: "18%" },
-  TECHNICAL_ANALYST: { x: "9%", y: "38%" },
-  FUNDAMENTALS_ANALYST: { x: "22%", y: "38%" },
-  NEWS_ANALYST: { x: "35%", y: "38%" },
-  MACRO_ANALYST: { x: "48%", y: "38%" },
-  SENTIMENT_ANALYST: { x: "61%", y: "38%" },
-  QUANT_ANALYST: { x: "74%", y: "38%" },
-  CRYPTO_SPECIALIST: { x: "87%", y: "38%" },
-  BULL_RESEARCHER: { x: "39%", y: "58%" },
-  BEAR_RESEARCHER: { x: "55%", y: "58%" },
-  TRADER_AGENT: { x: "21%", y: "78%" },
-  RISK_ANALYST: { x: "42%", y: "78%" },
-  AGGRESSIVE_RISK: { x: "56%", y: "78%" },
-  NEUTRAL_RISK: { x: "70%", y: "78%" },
-  CONSERVATIVE_RISK: { x: "84%", y: "78%" }
+  PORTFOLIO_MANAGER: { x: "43%", y: "20%" },
+  TEAM_LEAD: { x: "57%", y: "20%" },
+  TECHNICAL_ANALYST: { x: "10%", y: "43%" },
+  FUNDAMENTALS_ANALYST: { x: "23%", y: "43%" },
+  NEWS_ANALYST: { x: "36%", y: "43%" },
+  MACRO_ANALYST: { x: "49%", y: "43%" },
+  SENTIMENT_ANALYST: { x: "62%", y: "43%" },
+  QUANT_ANALYST: { x: "75%", y: "43%" },
+  CRYPTO_SPECIALIST: { x: "88%", y: "43%" },
+  BULL_RESEARCHER: { x: "41%", y: "61%" },
+  BEAR_RESEARCHER: { x: "59%", y: "61%" },
+  TRADER_AGENT: { x: "16%", y: "83%" },
+  RISK_ANALYST: { x: "33%", y: "83%" },
+  AGGRESSIVE_RISK: { x: "50%", y: "83%" },
+  NEUTRAL_RISK: { x: "67%", y: "83%" },
+  CONSERVATIVE_RISK: { x: "84%", y: "83%" }
 };
 
 const mobileOfficeStages = [
@@ -431,6 +431,108 @@ function PixelAvatar({ agent, thinking }: { agent: GameAgent; thinking: boolean 
       <span className="absolute left-[14px] bottom-0 h-2 w-10 border-2 border-black bg-black" />
       {propPixels(agent)}
     </div>
+  );
+}
+
+function OfficeSign({ children, className = "" }: { children: string; className?: string }) {
+  return (
+    <div className={`absolute z-20 border-2 border-slate-700 bg-[#10233a] px-4 py-1 text-center font-pixel text-[10px] font-bold uppercase tracking-normal text-white shadow-[0_3px_0_rgba(15,23,42,0.4)] ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function PixelPlant({ className = "" }: { className?: string }) {
+  return (
+    <div className={`absolute z-10 h-20 w-12 ${className}`} aria-hidden="true">
+      <span className="absolute bottom-0 left-2 h-10 w-8 border-4 border-black bg-[#f8fafc] shadow-[3px_3px_0_rgba(15,23,42,0.28)]" />
+      <span className="absolute bottom-8 left-5 h-8 w-3 border-2 border-black bg-[#15803d]" />
+      <span className="absolute bottom-12 left-1 h-4 w-8 rotate-[-20deg] border-2 border-black bg-[#16a34a]" />
+      <span className="absolute bottom-14 right-0 h-4 w-8 rotate-[20deg] border-2 border-black bg-[#22c55e]" />
+      <span className="absolute bottom-[68px] left-4 h-4 w-8 rotate-[-6deg] border-2 border-black bg-[#16a34a]" />
+    </div>
+  );
+}
+
+function MarketBoard() {
+  const rows = [
+    ["SPX", "5,280.15", "+0.58%"],
+    ["NDX", "18,732.91", "+0.74%"],
+    ["VIX", "12.83", "-0.31%"],
+    ["BTC", "66,842.10", "+1.12%"]
+  ];
+
+  return (
+    <div className="absolute right-[12%] top-[3%] z-10 h-[122px] w-[230px] border-4 border-slate-950 bg-[#07111f] p-3 shadow-[5px_5px_0_rgba(15,23,42,0.35)]" aria-hidden="true">
+      <p className="font-pixel text-[10px] uppercase text-slate-200">Market Overview</p>
+      <div className="mt-2 grid gap-1.5 font-mono text-[10px]">
+        {rows.map(([label, value, change]) => (
+          <div key={label} className="grid grid-cols-[34px_1fr_46px] gap-2">
+            <span className="text-slate-300">{label}</span>
+            <span className="text-slate-100">{value}</span>
+            <span className={change.startsWith("+") ? "text-emerald-400" : "text-red-400"}>{change}</span>
+          </div>
+        ))}
+      </div>
+      <span className="absolute bottom-3 right-4 h-14 w-20 border-l border-b border-slate-500/70 bg-[linear-gradient(135deg,transparent_46%,#22c55e_47%,#22c55e_53%,transparent_54%),linear-gradient(75deg,transparent_44%,#f97316_45%,#f97316_51%,transparent_52%)]" />
+    </div>
+  );
+}
+
+function BrandWall() {
+  return (
+    <div className="absolute right-[2.5%] top-[3%] z-10 grid h-[122px] w-[120px] place-items-center border-l border-slate-400/60 bg-[#f5f7f7]/88 shadow-[inset_1px_0_0_rgba(255,255,255,0.8)]" aria-hidden="true">
+      <div className="text-center">
+        <div className="mx-auto mb-2 grid h-12 w-12 place-items-center border-4 border-[#9a762c] bg-[#fff8df] font-pixel text-xl text-[#9a762c] shadow-[3px_3px_0_rgba(15,23,42,0.18)]">P</div>
+        <p className="font-pixel text-[10px] uppercase leading-4 tracking-normal text-slate-900">PixelFund<br />AI</p>
+      </div>
+    </div>
+  );
+}
+
+function AgentWorkstation({
+  agent,
+  active,
+  status,
+  recommendation,
+  state,
+  onSelect
+}: {
+  agent: GameAgent;
+  active: boolean;
+  status: string;
+  recommendation?: string;
+  state: string;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`group absolute z-30 h-[142px] w-[112px] -translate-x-1/2 -translate-y-1/2 text-left transition hover:z-40 hover:-translate-y-[52%] motion-safe:active:scale-95 ${active ? "z-40" : ""}`}
+      style={{ left: agent.x, top: agent.y }}
+      title={`${agent.role} (${status})`}
+      aria-label={agent.role}
+    >
+      <span className={`absolute left-2 right-2 top-0 min-h-[48px] rounded-[6px] border border-slate-950/20 bg-white/92 px-2 py-1.5 text-center shadow-[0_8px_18px_rgba(15,23,42,0.16)] ${active ? "ring-2 ring-[color:var(--pf-accent)]" : ""}`}>
+        <span className="block font-pixel text-[13px] leading-4 text-slate-950">{agent.label}</span>
+        <span className="block text-[9px] font-bold leading-3 text-slate-700">{agent.role}</span>
+      </span>
+      <span className="absolute bottom-[19px] left-0 right-0 h-10 border-4 border-slate-950 bg-[#9a7a5e] shadow-[4px_4px_0_rgba(15,23,42,0.3)]">
+        <span className="absolute -top-9 left-2 h-9 w-[43px] border-4 border-slate-950 bg-[#0b1524] shadow-[inset_0_0_0_4px_#163a44]" />
+        <span className="absolute -top-9 right-2 h-9 w-[43px] border-4 border-slate-950 bg-[#0b1524] shadow-[inset_0_0_0_4px_#18412f]" />
+        <span className="absolute left-3 top-2 h-3 w-9 border border-slate-950 bg-[#fef3c7]" />
+        <span className="absolute right-3 top-2 h-3 w-9 border border-slate-950 bg-[#dbeafe]" />
+      </span>
+      <span className="absolute bottom-0 left-[24px] h-9 w-16 border-4 border-slate-950 bg-[#202632] shadow-[3px_3px_0_rgba(15,23,42,0.28)]" />
+      <span className={`absolute left-3 top-[44px] h-[76px] w-[86px] rounded-[8px] border bg-white/30 shadow-[0_12px_20px_rgba(15,23,42,0.16)] ${stateClass(state, active)}`} />
+      <span className="absolute left-6 top-[48px]">
+        <PixelAvatar agent={agent} thinking={state === "thinking"} />
+      </span>
+      <span className="absolute bottom-[1px] left-[18px] right-[18px] grid h-5 place-items-center rounded-full border border-slate-950/20 bg-white/82 font-pixel text-[7px] uppercase text-slate-700">
+        {recommendation ?? status}
+      </span>
+    </button>
   );
 }
 
@@ -559,110 +661,75 @@ export function PixelOffice({
         agentStatuses={agentStatuses}
         agentRecommendations={agentRecommendations}
       />
-      <div className="glass-panel pixel-card relative hidden h-[620px] w-full overflow-hidden rounded-[8px] md:block lg:h-[650px] xl:h-[670px]">
-      <div className="absolute inset-x-0 top-0 h-28 bg-sky-200/36" />
-      <div className="absolute inset-x-0 top-28 h-24 bg-amber-200/24" />
-      <div className="absolute left-0 top-0 h-full w-20 bg-gradient-to-r from-white/32 to-transparent" />
-      <div className="absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-slate-950/8 to-transparent" />
-      <div className="absolute inset-x-0 top-0 h-full bg-[linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[length:24px_24px]" />
-      <div className="absolute left-[8%] top-8 h-20 w-[22%] rounded-[8px] border border-white/60 bg-white/48 shadow-[0_16px_38px_rgba(15,23,42,0.1)] backdrop-blur">
-        <span className="absolute left-2 top-2 h-8 w-[35%] border-2 border-black bg-[#f7fff7]" />
-        <span className="absolute right-2 top-2 h-8 w-[35%] border-2 border-black bg-[#fef3c7]" />
-        <span className="absolute bottom-2 left-2 h-3 w-[70%] border border-black bg-[#38bdf8]" />
-      </div>
-      <div className="absolute left-[40%] top-8 h-20 w-[22%] rounded-[8px] border border-white/60 bg-white/48 shadow-[0_16px_38px_rgba(15,23,42,0.1)] backdrop-blur">
-        <span className="absolute left-3 top-3 h-4 w-4 border-2 border-black bg-[#22c55e]" />
-        <span className="absolute left-10 top-3 h-4 w-4 border-2 border-black bg-[#facc15]" />
-        <span className="absolute left-3 top-10 h-4 w-16 border-2 border-black bg-white" />
-      </div>
-      <div className="absolute right-[7%] top-8 h-20 w-[22%] rounded-[8px] border border-white/60 bg-white/48 shadow-[0_16px_38px_rgba(15,23,42,0.1)] backdrop-blur">
-        <span className="absolute left-3 top-3 h-4 w-[68%] border-2 border-black bg-[#ef4444]" />
-        <span className="absolute left-3 top-9 h-4 w-[48%] border-2 border-black bg-[#22c55e]" />
-        <span className="absolute left-3 top-[3.7rem] h-2 w-[76%] bg-black" />
-      </div>
-      <div className="absolute bottom-0 h-52 w-full bg-[#81624e]" />
-      <div className="absolute bottom-0 h-52 w-full bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[length:32px_28px]" />
-      <div className="absolute bottom-44 left-0 right-0 h-5 bg-slate-700/75" />
-      <div className="absolute bottom-12 left-[8%] h-10 w-[84%] rounded-[8px] border border-slate-950/10 bg-[#4b372f] shadow-[0_18px_42px_rgba(15,23,42,0.22)]" />
+      <div className="glass-panel pixel-card relative hidden h-[760px] w-full overflow-hidden rounded-[8px] md:block xl:h-[790px]">
+        <div className="absolute inset-0 bg-[#d9dee4]" />
+        <div className="absolute inset-x-0 top-0 h-[178px] bg-[#e8ecef]" />
+        <div className="absolute inset-x-0 top-[178px] h-[172px] bg-[#c7cdd4]" />
+        <div className="absolute inset-x-0 top-[350px] h-[168px] bg-[#d2d5da]" />
+        <div className="absolute inset-x-0 bottom-0 h-[242px] bg-[#b7bcc4]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.075)_1px,transparent_1px),linear-gradient(rgba(15,23,42,0.065)_1px,transparent_1px)] bg-[length:32px_32px]" />
 
-      <div className="glass-chip absolute left-[4%] top-[24%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">evidence desks</div>
-      <div className="glass-chip absolute left-[32%] top-[47%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">bull vs bear</div>
-      <div className="glass-chip absolute left-[9%] top-[66%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">execution + risk</div>
-      <div className="glass-chip absolute right-[4%] top-[6%] z-20 rounded-full px-2 py-1 font-pixel text-[7px] text-slate-700 sm:text-[8px]">manager desk</div>
-
-      <div className="absolute left-[4%] top-[21%] h-16 w-[90%] rounded-[8px] border border-white/55 bg-white/46 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
-      <div className="absolute left-[8%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#dbeafe]" />
-      <div className="absolute left-[22%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#fef3c7]" />
-      <div className="absolute left-[36%] top-[23%] h-7 w-[12%] border-2 border-black bg-white" />
-      <div className="absolute left-[50%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#bae6fd]" />
-      <div className="absolute left-[64%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#fbcfe8]" />
-      <div className="absolute left-[78%] top-[23%] h-7 w-[12%] border-2 border-black bg-[#052e16] shadow-[inset_0_0_0_4px_#22c55e]" />
-
-      <div className="absolute left-[30%] top-[45%] h-16 w-[26%] rounded-[8px] border border-slate-950/20 bg-[#0f172a] shadow-[0_16px_36px_rgba(15,23,42,0.16)]" />
-      <div className="absolute left-[36%] top-[46%] h-2 w-[4%] bg-[#22c55e]" />
-      <div className="absolute left-[42%] top-[49%] h-2 w-[4%] bg-[#ef4444]" />
-      <div className="absolute left-[47%] top-[46%] h-2 w-[4%] bg-[#facc15]" />
-
-      <div className="absolute left-[10%] top-[66%] h-16 w-[78%] rounded-[8px] border border-white/55 bg-white/46 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
-      <div className="absolute left-[15%] top-[67%] h-8 w-10 border-2 border-black bg-[#fef3c7] shadow-[inset_0_-6px_0_#14b8a6]" />
-      <div className="absolute left-[41%] top-[67%] h-8 w-10 border-2 border-black bg-[#fed7aa]" />
-      <div className="absolute left-[55%] top-[67%] h-8 w-10 border-2 border-black bg-[#fecaca]" />
-      <div className="absolute left-[69%] top-[67%] h-8 w-10 border-2 border-black bg-[#e2e8f0]" />
-      <div className="absolute left-[82%] top-[67%] h-8 w-10 border-2 border-black bg-[#fef08a]" />
-
-      <div className="absolute right-[6%] bottom-[13%] h-20 w-[24%] rounded-[8px] border border-white/55 bg-white/48 shadow-[0_16px_36px_rgba(15,23,42,0.1)] backdrop-blur" />
-      <div className="absolute right-[10%] bottom-[22%] h-8 w-[15%] border-2 border-black bg-white shadow-[inset_0_-6px_0_#cbd5e1]" />
-      <div className="absolute left-[4%] bottom-[18%] h-20 w-12 border-4 border-black bg-[#8b5e34] shadow-[3px_3px_0_#111]">
-        <span className="absolute left-1 top-2 h-3 w-8 border border-black bg-[#fef3c7]" />
-        <span className="absolute left-1 top-7 h-3 w-8 border border-black bg-[#fef3c7]" />
-        <span className="absolute left-1 top-12 h-3 w-8 border border-black bg-[#fef3c7]" />
-      </div>
-      <div className="absolute right-[3%] top-[35%] h-16 w-10 border-4 border-black bg-[#0c7c59] shadow-[3px_3px_0_#111]">
-        <span className="absolute left-3 top-[-18px] h-6 w-4 border-2 border-black bg-[#16a34a]" />
-        <span className="absolute left-1 top-2 h-2 w-7 border border-black bg-[#bbf7d0]" />
-      </div>
-      <div className="absolute left-[5%] top-[38%] h-12 w-16 border-4 border-black bg-[#7c3aed] shadow-[3px_3px_0_#111]">
-        <span className="absolute left-2 top-2 h-2 w-10 bg-[#facc15]" />
-        <span className="absolute left-2 top-6 h-2 w-7 bg-[#22c55e]" />
-      </div>
-      <div className="absolute left-[13%] bottom-[12%] h-10 w-12 border-4 border-black bg-[#fff8e7] shadow-[3px_3px_0_#111]">
-        <span className="absolute left-3 top-[-10px] h-3 w-6 border-2 border-black bg-white" />
-        <span className="absolute left-5 top-2 h-4 w-3 bg-[#6b3f2a]" />
-      </div>
-      <div className="absolute left-[4%] top-3 z-20 flex max-w-[42%] justify-start px-2">
-        <div className="glass-chip max-w-full rounded-full px-3 py-2 text-left">
-          <p className="truncate font-pixel text-[10px] text-slate-900 sm:text-xs">{selected.name}</p>
-          <p className="mt-1 truncate text-[9px] font-black uppercase text-[color:var(--pf-accent)]">{selected.role} / {selectedStatus}</p>
+        <div className="absolute left-0 top-0 h-[178px] w-[17%] border-r border-slate-400/50 bg-[#b9ddf2]">
+          <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.5)_1px,transparent_1px)] bg-[length:34px_100%]" />
+          <span className="absolute bottom-0 left-0 right-0 h-16 bg-[linear-gradient(180deg,transparent,#e8ecef)]" />
+          <span className="absolute bottom-8 left-6 h-20 w-2 bg-white/65 shadow-[22px_-22px_0_4px_rgba(255,255,255,0.38),54px_-8px_0_8px_rgba(255,255,255,0.35),86px_-34px_0_7px_rgba(255,255,255,0.35)]" />
         </div>
-      </div>
 
-      {gameAgents.map((agent) => {
-        const active = selectedAgent === agent.id;
-        const { status: agentStatus, recommendation: rec, state } = agentRuntimeState(agent, agentStatuses, agentRecommendations);
+        <div className="absolute left-[17%] right-[32%] top-0 h-[178px] bg-[#4d4038] shadow-[inset_0_-10px_0_rgba(15,23,42,0.18)]">
+          <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[length:58px_100%]" />
+          <span className="absolute bottom-6 left-[12%] h-9 w-[76%] border-4 border-slate-950 bg-[#a07858] shadow-[5px_5px_0_rgba(15,23,42,0.3)]" />
+          <span className="absolute bottom-4 left-[13%] h-4 w-[74%] bg-[#3f332d]" />
+          <OfficeSign className="left-1/2 top-5 -translate-x-1/2">Manager Area</OfficeSign>
+        </div>
 
-        return (
-          <button
-            key={agent.id}
-            onClick={() => onSelect(agent.id)}
-            className={`absolute z-30 h-[112px] w-[74px] -translate-x-1/2 -translate-y-1/2 rounded-[8px] border font-pixel text-[7px] leading-none shadow-[0_14px_30px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.66)] backdrop-blur motion-safe:transition-all hover:z-40 hover:-translate-y-[53%] hover:brightness-105 motion-safe:active:scale-95 lg:h-[116px] lg:w-[76px] ${active ? "z-40 ring-2 ring-[color:var(--pf-accent)]" : ""} ${stateClass(state, active)}`}
-            style={{ left: agent.x, top: agent.y }}
-            title={`${agent.role} (${agentStatus})`}
-            aria-label={agent.role}
-          >
-            <PixelAvatar agent={agent} thinking={state === "thinking"} />
-            <div className="mx-1 mt-1 flex items-center justify-center gap-1">
-              <span className="font-bold">{agent.label}</span>
-              <span className="h-2 w-2 border border-black" style={{ backgroundColor: agent.accent }} />
-            </div>
-            <span className="mx-auto mt-0.5 block max-w-[68px] truncate text-[6px] uppercase">{state}</span>
-            {rec ? (
-              <span className={`mx-auto mt-1 block max-w-[56px] truncate rounded-full border px-1 py-0.5 text-[7px] ${recommendationColor[rec] ?? "border-white/60 bg-white/80"}`}>
-                {rec}
-              </span>
-            ) : null}
-          </button>
-        );
-      })}
+        <MarketBoard />
+        <BrandWall />
+        <PixelPlant className="left-[14%] top-[86px]" />
+        <PixelPlant className="right-[9%] top-[102px]" />
+
+        <OfficeSign className="left-1/2 top-[189px] -translate-x-1/2">Trading & Analysis Floor</OfficeSign>
+        <div className="absolute left-[2%] right-[2%] top-[248px] h-[92px] border-2 border-slate-400/70 bg-[#8d8278] shadow-[0_10px_0_rgba(15,23,42,0.16)]" />
+        <div className="absolute left-[2%] right-[2%] top-[246px] h-4 bg-[#5f666f]" />
+        <div className="absolute left-[2%] right-[2%] top-[336px] h-8 bg-[#6f747c]" />
+
+        <OfficeSign className="left-1/2 top-[428px] -translate-x-1/2 bg-[#0c5f53]">Strategy Desk</OfficeSign>
+        <div className="absolute left-[28%] right-[28%] top-[472px] h-[86px] border-2 border-slate-400/70 bg-[#8a8178] shadow-[0_10px_0_rgba(15,23,42,0.16)]" />
+        <PixelPlant className="left-[24%] top-[454px]" />
+        <PixelPlant className="right-[24%] top-[454px]" />
+
+        <OfficeSign className="left-1/2 top-[574px] -translate-x-1/2">Execution & Risk Area</OfficeSign>
+        <div className="absolute left-[1.5%] right-[1.5%] bottom-[118px] h-[92px] border-2 border-slate-400/70 bg-[#8d8278] shadow-[0_10px_0_rgba(15,23,42,0.16)]" />
+        <div className="absolute left-0 right-0 bottom-0 h-[118px] bg-[#7b6758]" />
+        <div className="absolute inset-x-0 bottom-0 h-[118px] bg-[linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[length:34px_28px]" />
+        <div className="absolute bottom-14 left-[8%] right-[8%] h-12 rounded-[8px] bg-[#3f302b] shadow-[0_12px_24px_rgba(15,23,42,0.28)]" />
+
+        <div className="absolute left-[3%] bottom-[110px] h-20 w-14 border-4 border-slate-950 bg-[#8b5e34] shadow-[4px_4px_0_rgba(15,23,42,0.35)]" aria-hidden="true">
+          <span className="absolute left-2 top-2 h-3 w-8 border border-black bg-[#fef3c7]" />
+          <span className="absolute left-2 top-7 h-3 w-8 border border-black bg-[#fef3c7]" />
+          <span className="absolute left-2 top-12 h-3 w-8 border border-black bg-[#fef3c7]" />
+        </div>
+
+        <div className="absolute left-4 top-4 z-20 max-w-[310px] rounded-[8px] border border-white/70 bg-white/88 px-3 py-2 shadow-[0_10px_26px_rgba(15,23,42,0.14)]">
+          <p className="truncate font-pixel text-[11px] text-slate-950">{selected.name}</p>
+          <p className="mt-1 truncate text-[10px] font-black uppercase text-[color:var(--pf-accent)]">{selected.role} / {selectedStatus}</p>
+        </div>
+
+        {gameAgents.map((agent) => {
+          const active = selectedAgent === agent.id;
+          const { status: agentStatus, recommendation: rec, state } = agentRuntimeState(agent, agentStatuses, agentRecommendations);
+
+          return (
+            <AgentWorkstation
+              key={agent.id}
+              agent={agent}
+              active={active}
+              status={agentStatus}
+              recommendation={rec}
+              state={state}
+              onSelect={() => onSelect(agent.id)}
+            />
+          );
+        })}
 
       {selectedPerformance ? (
         <div className="glass-chip absolute bottom-4 left-4 right-4 rounded-[8px] p-2 text-[9px] text-slate-900">

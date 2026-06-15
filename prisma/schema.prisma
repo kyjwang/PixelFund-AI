@@ -59,6 +59,12 @@ enum Recommendation {
   AVOID
 }
 
+enum PredictionHorizon {
+  SHORT_1_3D
+  SWING_5_20D
+  LONG_1_3M
+}
+
 enum CryptoTraderAction {
   BUY
   SELL
@@ -191,11 +197,31 @@ model AnalysisRun {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   recommendations AgentResult[]
+  mlPredictions   MlPrediction[]
 
   @@index([ownerKey, createdAt])
   @@index([ownerKey, ticker, createdAt])
   @@index([ticker, createdAt])
   @@index([idempotencyKey])
+}
+
+model MlPrediction {
+  id                   String            @id @default(cuid())
+  analysisRunId         String
+  analysisRun           AnalysisRun       @relation(fields: [analysisRunId], references: [id])
+  horizon              PredictionHorizon
+  modelVersion          String
+  recommendation        Recommendation
+  probabilities         Json
+  calibratedConfidence  Float
+  expectedReturnBucket  String
+  topFeatures           Json
+  shadowMode            Boolean           @default(true)
+  errorReason           String?
+  createdAt             DateTime          @default(now())
+
+  @@index([analysisRunId])
+  @@index([horizon, createdAt])
 }
 
 model AgentResult {
