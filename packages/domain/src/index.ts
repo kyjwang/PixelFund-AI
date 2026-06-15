@@ -1,4 +1,4 @@
-import type { AgentResult, BacktestResult, HistoricalCandle, MarketContext, TechnicalIndicators } from "@pixelfund/schemas";
+import type { AgentResult, BacktestResult, HistoricalCandle, MarketContext, PredictionHorizon, TechnicalIndicators } from "@pixelfund/schemas";
 
 export type Position = {
   ticker: string;
@@ -10,6 +10,8 @@ export type TradeSide = "BUY" | "SELL";
 export type OrderType = "MARKET" | "LIMIT" | "STOP";
 export type OrderStatus = "PENDING" | "FILLED" | "PARTIALLY_FILLED" | "CANCELED" | "REJECTED" | "EXPIRED";
 export type Recommendation = "BUY" | "HOLD" | "AVOID";
+export const PREDICTION_HORIZONS = ["SHORT_1_3D", "SWING_5_20D", "LONG_1_3M"] as const satisfies readonly PredictionHorizon[];
+export type { PredictionHorizon };
 export type AnalysisAgentType =
   | "TECHNICAL_ANALYST"
   | "NEWS_ANALYST"
@@ -78,6 +80,49 @@ type AgentEvidence = {
   status: string;
   reasons?: unknown;
   errorReason?: string | null;
+};
+
+export type ForwardOutcomeLabel = {
+  asOfDate: string;
+  horizon: PredictionHorizon;
+  startClose: number;
+  endClose: number;
+  forwardReturnPercent: number;
+  recommendation: Recommendation;
+};
+
+export type MlFeatureSnapshot = {
+  ticker: string;
+  asOfDate: string;
+  horizon: PredictionHorizon;
+  features: Record<string, number>;
+  featureAsOf: {
+    quoteUpdatedAt?: string;
+    fundamentalsSource?: string;
+    technicalsSource?: string;
+    maxNewsPublishedAt?: string;
+  };
+  excludedFutureEvidence: string[];
+};
+
+export type CalibrationObservation = {
+  agentType: AnalysisAgentType;
+  horizon: PredictionHorizon;
+  predictedConfidence: number;
+  wasCorrect: boolean;
+};
+
+export type CalibrationEntry = {
+  observations: number;
+  calibratedConfidence: number;
+  reliabilityWeight: number;
+};
+
+export type CalibrationTable = Record<string, CalibrationEntry>;
+
+type PortfolioAggregationOptions = {
+  horizon?: PredictionHorizon;
+  calibration?: CalibrationTable;
 };
 
 export function computeTechnicalIndicators(candles: HistoricalCandle[]): TechnicalIndicators {
@@ -304,6 +349,122 @@ export function aggregateRecommendation(
   return "HOLD";
 }
 
+export function labelForwardOutcome(candles: HistoricalCandle[], asOfDate: string, horizon: PredictionHorizon): ForwardOutcomeLabel | null {
+  const sorted = candles
+    .filter((candle) => candle.date && Number.isFinite(candle.close) && candle.close > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const startIdx = sorted.findIndex((candle) => candle.date === asOfDate);
+  if (startIdx < 0) return null;
+
+  const endIdx = startIdx + horizonTradingDays(horizon);
+  if (endIdx >= sorted.length) return null;
+
+  const startClose = sorted[startIdx].close;
+  const endClose = sorted[endIdx].close;
+  const forwardReturnPercent = round(((endClose - startClose) / startClose) * 100, 2);
+  const band = holdBandPercent(horizon);
+  const recommendation: Recommendation =
+    forwardReturnPercent >= band ? "BUY" : forwardReturnPercent <= -band ? "AVOID" : "HOLD";
+
+  return {
+    asOfDate,
+    horizon,
+    startClose,
+    endClose,
+    forwardReturnPercent,
+    recommendation
+  };
+}
+
+export function buildMlFeatureSnapshot(context: MarketContext, asOfDate: string, horizon: PredictionHorizon): MlFeatureSnapshot {
+  const cutoff = featureCutoff(asOfDate);
+  const excludedFutureEvidence: string[] = [];
+  const usableNews = (context.news ?? []).filter((item) => {
+    if (!item.publishedAt) return true;
+    const publishedAt = Date.parse(item.publishedAt);
+    if (Number.isFinite(publishedAt) && publishedAt > cutoff) {
+      excludedFutureEvidence.push(`news:${item.publishedAt}`);
+      return false;
+    }
+    return true;
+  });
+  const sentimentScores = usableNews.map((item) => item.sentimentScore ?? sentimentToScore(item.sentiment));
+  const newsSentimentAverage =
+    sentimentScores.length > 0 ? sentimentScores.reduce((sum, score) => sum + score, 0) / sentimentScores.length : 0;
+  const analystTotal = context.analystTrend
+    ? context.analystTrend.strongBuy + context.analystTrend.buy + context.analystTrend.hold + context.analystTrend.sell + context.analystTrend.strongSell
+    : 0;
+  const bullishAnalystShare =
+    context.analystTrend && analystTotal > 0 ? (context.analystTrend.strongBuy + context.analystTrend.buy) / analystTotal : 0;
+  const bearishAnalystShare =
+    context.analystTrend && analystTotal > 0 ? (context.analystTrend.sell + context.analystTrend.strongSell) / analystTotal : 0;
+
+  return {
+    ticker: context.ticker.toUpperCase(),
+    asOfDate,
+    horizon,
+    features: {
+      quotePrice: finiteOrZero(context.quote.price),
+      quoteChangePercent: finiteOrZero(context.quote.changePercent),
+      peRatio: finiteOrZero(context.fundamentals.peRatio),
+      beta: finiteOrZero(context.fundamentals.beta),
+      revenueGrowth: finiteOrZero(context.fundamentals.revenueGrowth),
+      netMargin: finiteOrZero(context.fundamentals.netMargin),
+      debtToEquity: finiteOrZero(context.fundamentals.debtToEquity),
+      sma20: finiteOrZero(context.technicals?.sma20),
+      sma50: finiteOrZero(context.technicals?.sma50),
+      volatility30d: finiteOrZero(context.technicals?.volatility30d),
+      maxDrawdown: finiteOrZero(context.technicals?.maxDrawdown),
+      trendUp: context.technicals?.trend === "UP" ? 1 : 0,
+      trendDown: context.technicals?.trend === "DOWN" ? 1 : 0,
+      volumeRising: context.technicals?.volumeTrend === "RISING" ? 1 : 0,
+      newsCount: usableNews.length,
+      newsSentimentAverage: round(newsSentimentAverage, 4),
+      bullishAnalystShare: round(bullishAnalystShare, 4),
+      bearishAnalystShare: round(bearishAnalystShare, 4),
+      dataQualityScore: context.dataQuality.score,
+      liveQuote: context.dataQuality.liveQuote ? 1 : 0,
+      fundamentalsLive: context.dataQuality.fundamentals ? 1 : 0,
+      newsLive: context.dataQuality.news ? 1 : 0
+    },
+    featureAsOf: {
+      quoteUpdatedAt: context.quote.updatedAt,
+      fundamentalsSource: context.fundamentals.source,
+      technicalsSource: context.technicals?.source,
+      maxNewsPublishedAt: usableNews
+        .map((item) => item.publishedAt)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1)
+    },
+    excludedFutureEvidence
+  };
+}
+
+export function calibrateConfidence(observations: CalibrationObservation[]): CalibrationTable {
+  const buckets = new Map<string, { count: number; correct: number; predicted: number }>();
+  for (const item of observations) {
+    const key = calibrationKey(item.agentType, item.horizon);
+    const bucket = buckets.get(key) ?? { count: 0, correct: 0, predicted: 0 };
+    bucket.count += 1;
+    bucket.correct += item.wasCorrect ? 1 : 0;
+    bucket.predicted += clamp(item.predictedConfidence, 0, 1);
+    buckets.set(key, bucket);
+  }
+
+  const table: CalibrationTable = {};
+  for (const [key, bucket] of buckets) {
+    const accuracy = bucket.correct / bucket.count;
+    const predicted = bucket.predicted / bucket.count;
+    table[key] = {
+      observations: bucket.count,
+      calibratedConfidence: round(accuracy, 2),
+      reliabilityWeight: round(clamp(accuracy / Math.max(0.05, predicted), 0.25, 1.25), 2)
+    };
+  }
+  return table;
+}
+
 export function buildAgentAnalysis(agentType: AnalysisAgentType, ticker: string, context: MarketContext, evidence: AgentEvidence[] = []): AgentAnalysisOutput {
   switch (agentType) {
     case "TECHNICAL_ANALYST":
@@ -350,7 +511,8 @@ export function buildAgentAnalysis(agentType: AnalysisAgentType, ticker: string,
 }
 
 export function aggregatePortfolioManager(
-  specialist: AgentEvidence[]
+  specialist: AgentEvidence[],
+  options: PortfolioAggregationOptions = {}
 ): AgentAnalysisOutput {
   const completed = specialist.filter((s) => s.status === "COMPLETED" && s.recommendation);
   if (completed.length === 0) {
@@ -371,11 +533,17 @@ export function aggregatePortfolioManager(
   for (const rec of completed) {
     const agentType = rec.agentType as AnalysisAgentType;
     const confidence = clamp(rec.confidence ?? 0.5, 0.2, 0.95);
-    const weight = (MANAGER_WEIGHTS[agentType] ?? 0.2) * confidence;
+    const calibration = options.horizon ? options.calibration?.[calibrationKey(agentType, options.horizon)] : undefined;
+    const reliabilityWeight = calibration?.reliabilityWeight ?? 1;
+    const effectiveConfidence = calibration?.calibratedConfidence ?? confidence;
+    const weight = (MANAGER_WEIGHTS[agentType] ?? 0.2) * confidence * reliabilityWeight;
     const recommendation = rec.recommendation as Recommendation;
     totalScore += stanceScore[recommendation] * weight;
     totalWeight += weight;
-    reasons.push(`${humanAgent(agentType)}: ${recommendation} at ${Math.round(confidence * 100)}% confidence`);
+    reasons.push(`${humanAgent(agentType)}: ${recommendation} at ${Math.round(effectiveConfidence * 100)}% confidence`);
+    if (calibration) {
+      reasons.push(`${humanAgent(agentType)} used calibrated reliability weight ${round(reliabilityWeight, 2)} for ${options.horizon}.`);
+    }
   }
 
   let score = totalWeight > 0 ? totalScore / totalWeight : 50;
@@ -1129,6 +1297,34 @@ function firstCompletedSummary(evidence: AgentEvidence[]) {
 
 function formatMoneyLike(value: number) {
   return `$${round(value, 2)}`;
+}
+
+function horizonTradingDays(horizon: PredictionHorizon) {
+  if (horizon === "SHORT_1_3D") return 3;
+  if (horizon === "SWING_5_20D") return 20;
+  return 63;
+}
+
+function holdBandPercent(horizon: PredictionHorizon) {
+  if (horizon === "SHORT_1_3D") return 2;
+  if (horizon === "SWING_5_20D") return 4;
+  return 7;
+}
+
+function featureCutoff(asOf: string) {
+  if (asOf.includes("T")) {
+    const exact = Date.parse(asOf);
+    if (Number.isFinite(exact)) return exact;
+  }
+  return Date.parse(`${asOf}T23:59:59.999Z`);
+}
+
+function finiteOrZero(value: unknown) {
+  return isFiniteNumber(value) ? value : 0;
+}
+
+function calibrationKey(agentType: AnalysisAgentType, horizon: PredictionHorizon) {
+  return `${agentType}:${horizon}`;
 }
 
 function clamp(value: number, min: number, max: number) {

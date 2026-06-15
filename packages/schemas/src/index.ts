@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const tickerSchema = z.string().trim().min(1).max(10).toUpperCase();
 export const recommendationSchema = z.enum(["BUY", "HOLD", "AVOID"]);
+export const predictionHorizonSchema = z.enum(["SHORT_1_3D", "SWING_5_20D", "LONG_1_3M"]);
 export const agentStatusSchema = z.enum(["PENDING", "RUNNING", "COMPLETED", "FAILED"]);
 export const dataQualityStatusSchema = z.enum(["LIVE", "PARTIAL", "DELAYED", "UNSUPPORTED", "DEMO"]);
 export const orderStatusSchema = z.enum(["PENDING", "FILLED", "PARTIALLY_FILLED", "CANCELED", "REJECTED", "EXPIRED"]);
@@ -171,6 +172,42 @@ export const marketContextSchema = z.object({
     warnings: z.array(z.string()),
     messages: z.array(z.string())
   })
+});
+
+export const mlExpectedReturnBucketSchema = z.enum(["NEGATIVE", "NEUTRAL", "POSITIVE"]);
+
+export const mlTopFeatureSchema = z.object({
+  name: z.string(),
+  value: z.number(),
+  contribution: z.number()
+});
+
+export const mlPredictionSchema = z.object({
+  horizon: predictionHorizonSchema,
+  probabilities: z.object({
+    BUY: z.number().min(0).max(1),
+    HOLD: z.number().min(0).max(1),
+    AVOID: z.number().min(0).max(1)
+  }),
+  recommendation: recommendationSchema,
+  calibratedConfidence: z.number().min(0).max(1),
+  expectedReturnBucket: mlExpectedReturnBucketSchema,
+  topFeatures: z.array(mlTopFeatureSchema)
+});
+
+export const mlPredictRequestSchema = z.object({
+  ticker: tickerSchema,
+  generatedAt: z.string(),
+  deterministicRecommendation: recommendationSchema,
+  deterministicConfidence: z.number().min(0).max(1),
+  horizons: z.array(predictionHorizonSchema).min(1),
+  features: z.record(z.number())
+});
+
+export const mlPredictResponseSchema = z.object({
+  modelVersion: z.string(),
+  generatedAt: z.string(),
+  predictions: z.array(mlPredictionSchema)
 });
 
 export const providerCapabilitySchema = z.object({
@@ -545,6 +582,10 @@ export type NewsItem = z.infer<typeof newsItemSchema>;
 export type Fundamentals = z.infer<typeof fundamentalsSchema>;
 export type AnalystTrend = z.infer<typeof analystTrendSchema>;
 export type MarketContext = z.infer<typeof marketContextSchema>;
+export type PredictionHorizon = z.infer<typeof predictionHorizonSchema>;
+export type MlPrediction = z.infer<typeof mlPredictionSchema>;
+export type MlPredictRequest = z.infer<typeof mlPredictRequestSchema>;
+export type MlPredictResponse = z.infer<typeof mlPredictResponseSchema>;
 export type StockHistory = z.infer<typeof stockHistorySchema>;
 export type BacktestCreateInput = z.infer<typeof backtestCreateSchema>;
 export type BacktestResult = z.infer<typeof backtestResultSchema>;

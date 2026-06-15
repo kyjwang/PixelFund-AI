@@ -5,8 +5,9 @@ import { AiService } from "../ai/ai.service";
 import { MarketService } from "../market/market.service";
 import { EventsGateway } from "../ws/events.gateway";
 import { AnalysisService } from "./analysis.service";
-import { ANALYSIS_PIPELINE, buildAgentAnalysis } from "@pixelfund/domain";
+import { ANALYSIS_PIPELINE, PREDICTION_HORIZONS, buildAgentAnalysis, buildMlFeatureSnapshot } from "@pixelfund/domain";
 import type { AgentType } from "@prisma/client";
+import { MlService } from "../ml/ml.service";
 
 @Processor("analysis")
 export class AnalysisProcessor extends WorkerHost {
@@ -15,7 +16,8 @@ export class AnalysisProcessor extends WorkerHost {
     private readonly ai: AiService,
     private readonly market: MarketService,
     private readonly events: EventsGateway,
-    private readonly analysis: AnalysisService
+    private readonly analysis: AnalysisService,
+    private readonly ml: MlService
   ) {
     super();
   }
@@ -32,7 +34,11 @@ export class AnalysisProcessor extends WorkerHost {
       const context = await this.market.context(ticker);
       for (const agent of ANALYSIS_PIPELINE) await this.runAgent(analysisRunId, agent as AgentType, ticker, context);
 
-      await this.analysis.finalizeManager(analysisRunId);
+      const manager = await this.analysis.finalizeManager(analysisRunId);
+      await this.runMlShadowPrediction(analysisRunId, ticker, context, {
+        recommendation: manager.recommendation ?? "HOLD",
+        confidence: manager.confidence ?? 0.45
+      });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown run error";
       await this.analysis.markRunFailed(analysisRunId, reason);
@@ -81,5 +87,39 @@ export class AnalysisProcessor extends WorkerHost {
         errorReason: reason
       });
     }
+  }
+
+  private async runMlShadowPrediction(
+    analysisRunId: string,
+    ticker: string,
+    context: Awaited<ReturnType<MarketService["context"]>>,
+    deterministic: { recommendation: "BUY" | "HOLD" | "AVOID"; confidence: number }
+  ) {
+    const snapshot = buildMlFeatureSnapshot(context, context.generatedAt, "SWING_5_20D");
+    const result = await this.ml.predict({
+      ticker,
+      generatedAt: context.generatedAt,
+      deterministicRecommendation: deterministic.recommendation,
+      deterministicConfidence: deterministic.confidence,
+      horizons: [...PREDICTION_HORIZONS],
+      features: snapshot.features
+    });
+
+    if (result.predictions.length === 0) return;
+
+    await this.prisma.mlPrediction.createMany({
+      data: result.predictions.map((prediction) => ({
+        analysisRunId,
+        horizon: prediction.horizon,
+        modelVersion: result.modelVersion ?? "unknown",
+        recommendation: prediction.recommendation,
+        probabilities: prediction.probabilities as any,
+        calibratedConfidence: prediction.calibratedConfidence,
+        expectedReturnBucket: prediction.expectedReturnBucket,
+        topFeatures: prediction.topFeatures as any,
+        shadowMode: result.shadowMode,
+        errorReason: result.errorReason ?? null
+      }))
+    });
   }
 }
