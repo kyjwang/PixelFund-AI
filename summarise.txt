@@ -1,0 +1,384 @@
+PixelFund AI - Project Summary
+
+PixelFund AI is an educational stock trading simulator built around a pixel-art trading office. The app lets a user choose a ticker, watch a team of specialist agents analyze it, receive a final Portfolio Manager recommendation, and then place virtual trades in a simulated portfolio.
+
+The project is not a real trading system and does not connect to a brokerage. It is designed for learning, experimentation, demos, and engineering discussion. The recommendations are educational signals only, not financial advice.
+
+The main idea is to make market analysis feel understandable and visual. Instead of showing only charts and tables, PixelFund AI turns the analysis process into a small trading floor. Each agent has a job, a visual role, and a backend responsibility. The system still keeps the important parts deterministic and testable: market data is normalized, domain logic calculates portfolio and order behavior, agents produce structured outputs, and the Portfolio Manager aggregates evidence into a final recommendation.
+
+
+How The App Works
+
+When the user opens the web app, the first experience is the PixelFund AI office. The office shows all the agents at their desks, including analysts, researchers, risk agents, a trader, a team lead, and the Portfolio Manager.
+
+The user enters a ticker such as AAPL, TSLA, NVDA, or another supported symbol. The frontend calls the NestJS API to fetch quote data, portfolio state, previous analysis runs, watchlist data, and market context. The app also connects to the websocket gateway so it can receive quote updates and analysis lifecycle events in realtime.
+
+When the user starts an analysis run, the API creates or reuses an AnalysisRun record and places a job into the BullMQ analysis queue. Redis is used as the queue backend. The AnalysisProcessor picks up the job and builds a market context for the ticker. That context includes the quote, fundamentals, technical indicators, news, analyst trend, macro data, social sentiment, crypto-related context when relevant, and a data-quality score.
+
+The analysis pipeline then runs through the agents in order. The first agents are specialists such as Technical Analyst, Fundamentals Analyst, News Analyst, Risk Analyst, Macro Analyst, Sentiment Analyst, Quant Analyst, and Crypto Specialist. After that, the Bull Researcher and Bear Researcher debate the evidence. The Trader Agent turns the evidence into a simulated trade plan. The Risk Council then reviews it from aggressive, neutral, and conservative risk postures. The Team Lead summarizes the room, and the Portfolio Manager produces the final recommendation.
+
+Each agent result is stored in the database. The frontend can show progress while the agents work, and when each agent completes, the pixel office updates its state. A bullish agent can look more positive, a bearish agent can look cautious, and a running agent can appear active or thinking.
+
+After the Portfolio Manager finishes, the final result is shown to the user as BUY, HOLD, or AVOID with a confidence score and reasons. The user can then place a virtual order. The simulator checks buying power, current holdings, quote freshness, order type, limit/stop trigger rules, and whether the market data is tradable. If the order is valid and market conditions allow it, the system updates the virtual portfolio.
+
+The app also stores history. The user can review previous analysis runs, agent outputs, trade history, order history, portfolio state, and system health.
+
+
+Architecture
+
+PixelFund AI is a Turborepo monorepo. The main parts are:
+
+apps/web
+This is the Next.js frontend. It renders the pixel office, ticker controls, portfolio panels, trade forms, history views, system page, profile page, and other user-facing screens. It uses TypeScript, React, Tailwind, and shared schemas from the monorepo.
+
+apps/api
+This is the NestJS backend. It owns the REST API, websocket gateway, BullMQ analysis processor, market data services, portfolio and order services, crypto trader service, health checks, AI narration service, and ML shadow client.
+
+packages/schemas
+This package contains the shared Zod schemas and TypeScript types. It is the source of truth for API contracts, websocket payloads, portfolio objects, market context, orders, trades, analysis runs, agent results, crypto trader objects, and ML prediction contracts. This matters because both the frontend and backend can agree on the same shapes.
+
+packages/domain
+This package contains deterministic business logic. It handles portfolio accounting, order trigger evaluation, technical indicators, agent analysis scoring, Portfolio Manager aggregation, ML feature snapshot generation, forward outcome labels, and calibration helpers. This matters because critical behavior is testable outside the API and UI.
+
+prisma
+This contains the Prisma database schema and migrations. PostgreSQL stores demo accounts, positions, trades, orders, watchlist items, analysis runs, agent results, crypto trader settings/logs, and ML shadow predictions.
+
+apps/ml
+This is the Python FastAPI ML service. It currently provides the contract and baseline logic for shadow-mode predictions, walk-forward backtesting, and calibration. The NestJS app can call it, but the ML signal does not change live recommendations yet. It records predictions first so accuracy can be measured before trusting the model.
+
+docker-compose.yml
+This starts PostgreSQL and Redis for local development. PostgreSQL stores app state and Redis powers background jobs and queue processing.
+
+
+Important Functions And Why They Matter
+
+Web UI and Pixel Office
+
+The frontend is responsible for making the trading workflow feel alive. The main page coordinates ticker selection, API calls, websocket updates, portfolio state, current analysis run, agent results, recommendation display, and trading controls.
+
+PixelOffice renders the visual trading floor. It maps the backend agent profiles to visible characters and places them into an office layout. Each character can reflect runtime status, such as idle, running, bullish, cautious, or failed. The point of this component is to make a complex multi-agent pipeline readable at a glance.
+
+AppShell wraps the application with the common layout and navigation. It gives the app a consistent PixelFund AI identity.
+
+GameUI contains reusable UI pieces such as cards, buttons, status badges, HUD panels, agent cards, dialogue boxes, mission panels, search panels, and team decision panels. These components keep the interface consistent and avoid repeating visual logic everywhere.
+
+The frontend API helper wraps requests to the backend and validates responses using Zod schemas. It also attaches the demo user header so each browser can have its own isolated simulated account.
+
+The auth helpers store a lightweight demo user in local storage. This is not production authentication. It is a simple way to give the simulator separate local identities without building a full auth system.
+
+The analysis polling helpers decide when the frontend should keep polling an analysis run and how progress should be displayed. This protects the UI from getting stuck when a run is still pending or running.
+
+
+API Controllers and Services
+
+The NestJS API is divided into modules. Controllers expose routes, while services perform the actual work.
+
+The AppModule connects the main modules together: portfolio, trades, orders, analysis, market, backtests, watchlist, health, crypto trader, quotes, and websockets. It also configures Redis/BullMQ and global config.
+
+The AnalysisController exposes routes for creating analysis runs, listing runs, clearing history, and getting explainability data. It does not do the heavy analysis itself. Its job is to validate requests and call AnalysisService.
+
+AnalysisService creates and manages AnalysisRun records. It creates the agent result rows for a run, handles idempotency keys, marks failures, finalizes the Portfolio Manager result, and builds explainability responses.
+
+AnalysisProcessor is the worker that performs the real background analysis. It receives BullMQ jobs, builds market context, runs every agent in the pipeline, stores results, emits websocket events, finalizes the manager result, and now also calls the ML service in shadow mode. This separation matters because long-running analysis should not block normal HTTP requests.
+
+MarketController exposes stock search, quote, history, and context routes. MarketService builds the combined MarketContext object used by agents. It pulls data from provider abstractions and computes data-quality status.
+
+PortfolioController and PortfolioService return the current simulated account state. PortfolioService combines cash, positions, latest quote values, realized P&L, unrealized P&L, and total account value.
+
+TradesController and TradesService support legacy immediate virtual trades. They preview or apply buy/sell operations using deterministic portfolio accounting from the domain package.
+
+OrdersController and OrdersService support durable orders. This is the safer and more realistic order flow. Orders can be market, limit, or stop. The service checks whether orders are executable, whether the quote is live enough, whether data quality is tradable, and whether funds or shares are sufficient. It also updates order status and emits websocket events.
+
+WatchlistController and WatchlistService manage saved tickers for the current demo account.
+
+QuotesService manages quote subscriptions and quote polling. It deduplicates ticker subscriptions and emits quote.updated or quote.stale events through the websocket gateway.
+
+EventsGateway is the websocket layer. It handles client connections, ticker subscriptions, and server-side event emission for quotes, analysis lifecycle, portfolio updates, order updates, and recommendation completion.
+
+HealthController reports API, database, Redis, market data, and AI provider readiness. This helps debugging and deployment checks.
+
+AiService is used to polish agent narration. The important design choice is that AI wording is not the source of truth. Deterministic domain logic creates the base recommendation, score, confidence, and reasons. The LLM can improve readability, but it should not invent the decision.
+
+MlService is the NestJS client for the Python ML service. It is disabled by default and runs in shadow mode when enabled. If the ML service is unavailable, it fails closed and returns no predictions instead of breaking the analysis pipeline.
+
+
+Market Data Providers
+
+The market data layer is intentionally abstracted behind provider interfaces. This lets the app use multiple providers and degrade gracefully when one is unavailable.
+
+FinnhubProvider, AlphaVantageProvider, SecEdgarProvider, FredProvider, SocialSentimentProvider, CoinGeckoProvider, and YahooCryptoProvider each focus on a specific kind of market or context data.
+
+ProviderRegistry coordinates provider availability and creates source audits. Source audits explain which data was used, which provider supplied it, what was missing, and whether the data is live, partial, delayed, unsupported, or demo. This is important because agents should be less confident when the evidence is weak.
+
+MarketService combines provider data into one MarketContext. It computes data-quality score and status, attaches messages and warnings, and gives the analysis pipeline one consistent object to work with.
+
+CoinGeckoProvider and crypto-related services add context for crypto assets and crypto-sensitive equities. This helps agents understand when a stock may be affected by broader crypto liquidity or sentiment.
+
+
+Analysis Pipeline and Agents
+
+The shared domain package defines AGENT_PROFILES, ANALYSIS_PIPELINE, and MANAGER_WEIGHTS. These constants define which agents exist, how they are displayed, what stage they belong to, and how much weight they normally have in the final Portfolio Manager score.
+
+buildAgentAnalysis is the central deterministic agent dispatcher. Given an agent type, ticker, market context, and existing evidence, it calls the correct agent logic.
+
+technicalAnalysis reads technical indicators like trend, moving averages, volatility, drawdown, price change, and volume behavior. It works because price action and risk indicators are normalized into a single MarketContext.
+
+newsAnalysis reads news sentiment and analyst trend. It looks for catalysts, positive or negative tone, and evidence quality.
+
+fundamentalsAnalysis reads valuation, growth, margins, debt, beta, and business quality. It rewards strong growth and profitability but becomes cautious when valuation or leverage looks stretched.
+
+riskAnalysis checks volatility, beta, drawdown, data-quality warnings, and downside risks. It can push the final recommendation toward HOLD or AVOID when the setup is too uncertain.
+
+macroAnalysis uses broader macro series and market regime context. It adds a view on whether the external environment supports or challenges the ticker.
+
+sentimentAnalysis reads social/news sentiment and analyst consensus. It helps capture crowd tone and possible enthusiasm or fear.
+
+quantAnalysis turns multiple numeric factors into a more model-like score. It helps avoid relying only on narrative evidence.
+
+cryptoSpecialistAnalysis checks crypto context and crypto beta for related names. It matters for tickers that move with crypto liquidity or digital asset sentiment.
+
+bullResearch builds the strongest upside case from completed evidence. It is useful because it forces the system to state why the trade could work.
+
+bearResearch builds the strongest downside case. It is useful because it forces the system to state what could go wrong.
+
+traderPlan turns the committee view into a practical simulated trade plan. It focuses on action, sizing, entry logic, invalidation, and horizon.
+
+riskCouncil runs three risk views: aggressive, neutral, and conservative. This makes it easier to understand how different risk profiles would interpret the same evidence.
+
+teamLeadSummary summarizes the whole room so the user can understand the discussion before the final decision.
+
+aggregatePortfolioManager combines completed agent outputs into one final recommendation. It uses base weights, confidence, recommendation stance, data coverage, conflict, and risk caps. Risk Analyst and Conservative Risk can cap the score when they have high-confidence AVOID signals. This is one of the most important functions because it keeps the final recommendation deterministic and auditable.
+
+buildAnalysisExplanation creates a structured explanation of the final manager score. It calculates vote mix, effective weights, contributions, caveats, top contributors, coverage, and agent-level details. This lets the UI explain why the Portfolio Manager decided something.
+
+
+Portfolio, Trade, and Order Logic
+
+applyTrade is the core portfolio accounting function. It updates cash, positions, average cost, realized P&L, and holdings when a simulated buy or sell happens. It prevents invalid states such as negative cash or selling more shares than the account owns.
+
+isOrderTriggered decides whether a market, limit, or stop order should trigger at the current price. This keeps order behavior consistent and testable.
+
+canCancelOrder decides whether an order status can still be canceled.
+
+evaluateOrderFill checks whether an order can be filled and what the resulting portfolio state should be. It combines trigger logic, quote price, available cash, available shares, and order type.
+
+runPortfolioManagerBacktest replays a simple strategy over historical candles. It is used for simulator backtesting and recommendation accuracy experiments.
+
+computeTechnicalIndicators calculates moving averages, volatility, drawdown, trend, and volume trend from historical candles. The agents rely on these values instead of recalculating raw candle logic every time.
+
+aggregateRecommendation is a small helper that combines multiple recommendations using confidence weights. It supports simpler aggregation cases outside the full Portfolio Manager flow.
+
+Utility helpers such as clamp, round, averageLast, annualizedVolatility, calculateMaxDrawdown, formatPercent, compactCurrency, and sentiment mapping exist to keep calculations consistent across the domain logic.
+
+
+Shared Schemas and Contracts
+
+packages/schemas is the contract layer. It defines Zod schemas and TypeScript types for:
+
+Quotes
+Historical candles
+Technical indicators
+News items
+Fundamentals
+Analyst trends
+Market context
+Provider capabilities
+System health
+Trades
+Orders
+Portfolio
+Agent results
+Analysis runs
+Analysis explanations
+Crypto trader settings and logs
+Websocket events
+ML predictions
+Error and success envelopes
+
+The reason this works well is that the same schema package can be used by the API, domain code, and frontend. That reduces drift. If the backend returns a shape the frontend does not expect, validation can catch it earlier.
+
+The response envelope pattern is also standardized. Successful REST responses are wrapped in data, and errors are wrapped in error with code, message, details, and requestId.
+
+
+Database Models
+
+The Prisma schema stores the persistent state.
+
+DemoAccount represents a browser-isolated simulator account. It owns cash, positions, trades, orders, watchlist items, crypto settings, and crypto logs.
+
+Position stores ticker, quantity, average cost, realized P&L, and account ownership.
+
+Trade stores filled virtual buy/sell activity.
+
+Order stores durable simulator orders, including side, quantity, order type, status, limit/stop prices, fill price, rejection reason, and timestamps.
+
+WatchlistItem stores saved tickers for an account.
+
+AnalysisRun stores a ticker analysis session. It has status, final recommendation fields, timestamps, idempotency key, error reason, and related agent results.
+
+AgentResult stores each agent output for a run. It includes agent type, status, summary, confidence, recommendation, reasons, and error information.
+
+MlPrediction stores shadow-mode ML predictions. It records the analysis run, prediction horizon, model version, recommendation, probabilities, calibrated confidence, expected return bucket, top feature contributions, shadow-mode flag, and errors.
+
+CryptoTraderSettings stores whether the crypto trader is enabled, its mode, allowed coins, sizing, and cash allocation.
+
+CryptoTraderLog stores the decisions made by the crypto trader, including signal, reasons, price, quantity, score, and whether a trade happened.
+
+
+ML Service, Prediction Horizons, Calibration, and Backtesting
+
+The ML layer was added as an accuracy improvement foundation. It does not replace the deterministic agents yet. It runs in shadow mode first.
+
+The shared horizons are:
+
+SHORT_1_3D
+SWING_5_20D
+LONG_1_3M
+
+These horizons let the system measure whether a recommendation was good over different time windows instead of pretending there is only one kind of prediction.
+
+buildMlFeatureSnapshot creates a numeric feature row from MarketContext. It includes quote movement, fundamentals, technical indicators, trend flags, news count, sentiment average, analyst shares, data-quality score, and live-data flags. It also excludes future evidence. This matters because ML backtests are useless if they accidentally use information that was not known at the prediction time.
+
+labelForwardOutcome takes historical candles and labels what actually happened after the chosen horizon. It returns BUY, HOLD, or AVOID based on forward return and a neutral HOLD band. This gives the ML service a target label for training and evaluation.
+
+calibrateConfidence groups historical observations by agent and horizon. It compares predicted confidence with actual correctness and produces a reliability weight. This helps the Portfolio Manager treat historically reliable agents more strongly and overconfident agents more carefully.
+
+The Python FastAPI service exposes:
+
+POST /predict
+Returns horizon-level probabilities, recommendation, calibrated confidence, expected return bucket, model version, and top feature contributions.
+
+POST /backtest/walk-forward
+Runs a walk-forward style validation over historical candles and summarizes hit rate, average return, drawdown, Brier score, log loss, and coverage.
+
+POST /calibrate
+Builds calibration tables from historical predictions and outcomes.
+
+The current model is a baseline shadow predictor. That is intentional. The first goal is to get the API contract, prediction storage, metrics, and backtesting path correct before trusting a trained model. The next serious model step is LightGBM with MLflow tracking.
+
+
+Crypto Trader Extension
+
+The crypto trader is a separate simulator feature focused on BTC, ETH, and SOL. It can run in balanced or aggressive mode.
+
+CryptoMarketDataService collects crypto market data from providers and checks whether the data is usable.
+
+evaluateCryptoSignal scores crypto signals using price momentum, moving averages, volatility, drawdown, data freshness, and mode. It returns BUY, SELL, or HOLD with reasons.
+
+CryptoTraderService manages settings, scheduled checks, cash allocation, trade execution decisions, logs, and safeguards. It does not trade real crypto. It only updates the simulator.
+
+The aggressive mode runs more frequently for a limited session window, while balanced mode is more conservative.
+
+
+Tests and Verification
+
+The project has tests across the domain, API, frontend helpers, crypto strategy, market providers, and ML layer.
+
+Domain tests protect portfolio accounting, recommendation aggregation, agent analysis behavior, ML labels, feature snapshots, calibration, and manager aggregation. These are important because domain logic should be deterministic and safe.
+
+API tests protect service behavior, provider fallback behavior, crypto trader behavior, health checks, market services, analysis services, and ML service contract behavior.
+
+Frontend tests protect analysis polling and timeline helpers.
+
+Python tests protect ML core behavior, including horizons, labels, calibration, and baseline prediction shape.
+
+The common verification commands are:
+
+npm run db:generate
+npm test
+npm run typecheck
+npm run docs:check-links
+npm run health:check
+
+
+Project Stages
+
+Stage 1: Monorepo Foundation
+
+The project started with the Turborepo structure. The frontend, backend, shared schemas, shared domain logic, Prisma database, Docker Compose services, setup scripts, and validation commands were created. This stage made the project runnable and organized.
+
+The important result of this stage was separation of concerns. UI code lives in apps/web, API code lives in apps/api, shared contracts live in packages/schemas, deterministic business logic lives in packages/domain, and database structure lives in prisma.
+
+
+Stage 2: Trading Simulator
+
+The next stage added the virtual portfolio. Users could have a demo account, hold cash, buy and sell virtual shares, track positions, and see realized and unrealized P&L.
+
+The domain package became important here because portfolio math must be correct. Buying updates average cost and cash. Selling checks share availability and updates realized P&L. Invalid trades are rejected instead of creating impossible states.
+
+Durable orders were added after basic trades. Market, limit, and stop orders can be previewed, created, filled, rejected, or canceled. The system also fails closed when quote data is stale, demo-only, unsupported, or not tradable.
+
+
+Stage 3: Market Data Layer
+
+The market data layer was expanded beyond simple quotes. The app now builds a full market context with quote, history, technicals, fundamentals, news, analyst trend, macro series, social sentiment, crypto context, and source audits.
+
+This stage matters because agent quality depends on evidence quality. The app does not just ask an LLM what it thinks. It gathers structured evidence first, checks data quality, and lowers confidence when data is partial or unsupported.
+
+
+Stage 4: Multi-Agent Analysis
+
+The analysis pipeline was built around BullMQ jobs. A user request creates an analysis run, but the actual work happens in a background processor.
+
+The agent team was expanded from basic specialists into a fuller investment committee: technical, fundamentals, news, risk, macro, sentiment, quant, crypto, bull researcher, bear researcher, trader, risk council, team lead, and Portfolio Manager.
+
+This stage made the product more explainable. Instead of one black-box recommendation, the user can see how each type of evidence contributed to the final decision.
+
+
+Stage 5: Realtime Events and Explainability
+
+Websocket events were added so the UI could update while analysis runs. Quote updates, stale quote warnings, agent started/completed/failed events, order updates, and portfolio recommendation events can flow from the backend to the frontend.
+
+Explainability was also added. The app can show vote mix, confidence, coverage, top contributors, caveats, agent weights, and reasons. This makes the final recommendation easier to audit.
+
+
+Stage 6: Pixel Office Redesign
+
+The visual frontend was redesigned into a cleaner PixelFund AI office concept. The office now shows the manager area, trading and analysis floor, strategy desk, execution and risk area, and all agents. The old Alpha Capital label was replaced with PixelFund AI.
+
+The purpose of this stage was to make the interface feel less messy and more like a professional pixel-art trading floor. The frontend still remains functional: agents are not just decorative; they represent real backend analysis roles and can reflect analysis state.
+
+
+Stage 7: Crypto Trader Extension
+
+The crypto trader added a separate simulator workflow for BTC, ETH, and SOL. It includes crypto settings, market data, signal evaluation, logs, mode switching, and safeguards.
+
+This stage expanded the simulator beyond stocks while keeping the same principle: virtual-only decisions, deterministic checks, and clear reasons.
+
+
+Stage 8: Accuracy Improvement / ML Shadow Layer
+
+The most recent stage added the foundation for improving hit rate and accuracy. A Python FastAPI ML service was added under apps/ml. The system now has explicit prediction horizons, ML schemas, feature snapshots, forward labels, calibration helpers, backtesting metrics, and Prisma storage for shadow predictions.
+
+The key decision was to keep deterministic agents as the source of truth for now. The ML service runs in shadow mode. It records predictions and metrics without changing the live recommendation. This is the right approach because a model should prove itself on out-of-sample metrics before it is allowed to influence user-facing decisions.
+
+
+Current Status
+
+PixelFund AI currently has a working fullstack simulator structure. It includes the pixel office frontend, virtual portfolio trading, durable orders, market data context, multi-agent analysis, realtime events, recommendation explainability, crypto trader logic, and the first version of the ML shadow accuracy layer.
+
+The shared schema and domain packages make the system easier to test and reason about. The API is modular. The frontend is visual and engaging. The new ML layer creates a path toward better accuracy without risking the current deterministic recommendation pipeline.
+
+The project is already useful as a demo and learning tool, but it is still an educational simulator.
+
+
+Recommended Next Steps
+
+The next major step is to collect real historical feature snapshots and outcomes. The ML layer needs a dataset before it can train meaningful models.
+
+After that, LightGBM can be added for tabular prediction. Models should be trained separately by horizon and evaluated with walk-forward validation. The system should track hit rate, average return, drawdown, Brier score, log loss, and coverage.
+
+MLflow should be used to track experiments, feature lists, model versions, calibration curves, and active model flags.
+
+The ML signal should stay in shadow mode until it beats the deterministic baseline on out-of-sample metrics. Only then should it be blended into the Portfolio Manager recommendation.
+
+More integration tests should be added against real PostgreSQL and Redis test instances. This would improve confidence in queue processing, order state transitions, websocket events, and database migrations.
+
+Production hardening would include real authentication, stronger observability, deployment monitoring, CI checks for migrations and docs drift, and better provider fallback monitoring.
+
+The Vercel deployment failure shown in the screenshot should be inspected separately with the Vercel deployment logs. The codebase itself has local test and typecheck coverage, but deployment can fail for environment, build, dependency, or platform configuration reasons.
+
+
+Final Disclaimer
+
+PixelFund AI is for education, simulation, and experimentation. It does not provide financial advice, does not execute real trades, and should not be used as live trading infrastructure.
